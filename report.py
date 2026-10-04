@@ -123,7 +123,7 @@ def format_working_txt(records, source_dir: str = "") -> Tuple[str, int]:
         r0 = krows[0]
         rec = _find_by_fingerprint(records, key)
         details = (getattr(rec, "details", None) or {}) if rec else {}
-        lines.append(f"# credential: {key} ({r0.get("masked_key", "")})")
+        lines.append(f"# credential: {key} ({r0.get('masked_key', '')})")
         lines.append(f"# provider: {r0['provider']} ({provider_label(r0['provider'])})")
         if r0["account"]:
             cur = f" {r0['currency']}" if r0["currency"] else ""
