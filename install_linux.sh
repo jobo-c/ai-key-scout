@@ -44,7 +44,7 @@ echo "[+] Upgrading pip/setuptools/wheel..."
 "$PYTHON_BIN" -m pip install --upgrade pip setuptools wheel
 
 echo "[+] Installing runtime dependencies..."
-"$PYTHON_BIN" -m pip install PyQt6 requests PyYAML
+"$PYTHON_BIN" -m pip install PyQt6 requests PyYAML aiohttp
 
 echo "[+] Checking Python compilation..."
 "$PYTHON_BIN" -m compileall -q .
