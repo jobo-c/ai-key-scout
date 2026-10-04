@@ -181,3 +181,4 @@ PLUGIN_PROVIDERS = {
 
 for _pid, _cfg in PLUGIN_PROVIDERS.items():
     _cfg["provider_kind"] = "tool"
+    _cfg["discoverable"] = False  # never brute-force opaque tool keys during LLM discovery
