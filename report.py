@@ -27,7 +27,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple\n\nfrom .security import fingerprint, mask_secret\n
 
 WORKING_TXT = "working_keys.txt"
 WORKING_JSON = "working_keys.json"
@@ -61,7 +61,8 @@ def working_rows(records) -> List[Dict[str, Any]]:
         for model in working:
             t = tests.get(model) or {}
             rows.append({
-                "key": getattr(r, "key", ""),
+                "fingerprint": fingerprint(getattr(r, "key", "")),
+                "masked_key": mask_secret(getattr(r, "key", "")),
                 "provider": getattr(r, "provider", ""),
                 "model": model,
                 "tier": t.get("tier") or ("free" if str(model).endswith(":free") or str(model) == "openrouter/free" else "unknown"),
@@ -79,10 +80,10 @@ def working_rows(records) -> List[Dict[str, Any]]:
 def format_working_txt(records, source_dir: str = "") -> Tuple[str, int]:
     """Render working_keys.txt. Returns (text, number_of_rows)."""
     rows = working_rows(records)
-    keys = {r["key"] for r in rows}
+    keys = {r["fingerprint"] for r in rows}
     lines: List[str] = [
         "#" + "=" * 74,
-        "# AI Key Scout v4 — WORKING KEYS",
+        "# AI Key Scout v5 — WORKING KEYS",
         "# Every key that answered a real 'hi' prompt, per model.",
         f"# generated : {time.strftime('%Y-%m-%d %H:%M:%S')}",
     ]
@@ -102,7 +103,7 @@ def format_working_txt(records, source_dir: str = "") -> Tuple[str, int]:
     ]
     for row in rows:
         lines.append(SEP.join([
-            row["key"], row["provider"], _clean(provider_label(row["provider"])),
+            row["fingerprint"], row["provider"], _clean(provider_label(row["provider"])),
             row["model"], row["tier"], row["latency_ms"], row["account"], row["reply"] or "",
         ]))
     lines += [
@@ -116,13 +117,13 @@ def format_working_txt(records, source_dir: str = "") -> Tuple[str, int]:
 
     by_key: Dict[str, List[Dict[str, Any]]] = {}
     for row in rows:
-        by_key.setdefault(row["key"], []).append(row)
+        by_key.setdefault(row["fingerprint"], []).append(row)
 
     for key, krows in by_key.items():
         r0 = krows[0]
-        rec = _find(records, key)
+        rec = _find_by_fingerprint(records, key)
         details = (getattr(rec, "details", None) or {}) if rec else {}
-        lines.append(f"# key: {key}")
+        lines.append(f"# credential: {key} ({r0.get("masked_key", "")})")
         lines.append(f"# provider: {r0['provider']} ({provider_label(r0['provider'])})")
         if r0["account"]:
             cur = f" {r0['currency']}" if r0["currency"] else ""
@@ -152,6 +153,13 @@ def format_working_txt(records, source_dir: str = "") -> Tuple[str, int]:
     lines.append("#" + "=" * 74)
     lines.append(f"# {len(keys)} key(s) / {len(rows)} working model(s)")
     return "\n".join(lines) + "\n", len(rows)
+
+
+def _find_by_fingerprint(records, fp: str):
+    for r in records:
+        if fingerprint(getattr(r, "key", "") or "") == fp:
+            return r
+    return None
 
 
 def provider_label(pid: str) -> str:
