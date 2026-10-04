@@ -1265,6 +1265,20 @@ class MainWindow(QMainWindow):
         ]
         self.detail.setPlainText("\n".join(lines))
 
+    def _autosave_history(self, reason: str = ""):
+        """Best-effort automatic history persistence after scan/check operations."""
+        try:
+            data = key_history.load_history()
+            added = key_history.merge_records(data, self.store.all())
+            path = key_history.save_history(data)
+            log.info(
+                "History autosaved reason=%s path=%s new_keys=%d total=%d",
+                reason or "auto", path, added, len(data.get("keys", {})),
+            )
+        except Exception:
+            # History must never make a completed scan/check fail.
+            log.exception("Automatic history save failed reason=%s", reason or "auto")
+
     def save_history(self):
         """Merge the current in-memory records into persistent history.json."""
         try:
