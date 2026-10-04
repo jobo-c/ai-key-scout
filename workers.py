@@ -556,7 +556,7 @@ class CheckWorker(QThread):
                         if enriched % 10 == 0 or enriched == n:
                             self.status.emit(f"Enriching… {enriched}/{n}")
 
-                enrich_chunk = max(8, deep_sem._value * 4)
+                enrich_chunk = max(8, min(48, self.concurrency * 2))
                 for i in range(0, len(valid_items), enrich_chunk):
                     if self._stop:
                         break
