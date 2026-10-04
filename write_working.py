@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app.report import (  # noqa: E402
+from report import (  # noqa: E402
     WORKING_TXT,
     format_working_json,
     format_working_txt,
@@ -54,7 +54,7 @@ def main() -> int:
         txt, js, n = write_working_file(records, args.out, filename=args.filename)
         print(f"wrote {txt}")
         print(f"wrote {js}")
-        print(f"{len({r['key'] for r in format_working_json(records)['records']})} key(s), "
+        print(f"{len({r['fingerprint'] for r in format_working_json(records)['records']})} key(s), "
               f"{n} working model(s)")
 
     if args.require_any and n == 0:
