@@ -16,8 +16,7 @@ SECRET_KEYS = {
 }
 
 KEY_ASSIGNMENT_RE = re.compile(
-    r"""(?i)(\b(?:api[_-]?key|token|secret|password|authorization|credential)
-    \s*[:=]\s*)(['"]?)([^\s,;'"}]+)(\2)"""
+    r"""(?i)(\b(?:api[_-]?key|token|secret|password|authorization|credential)\s*[:=]\s*)(['"]?)([^\s,;'"}]+)(\2)"""
 )
 
 def fingerprint(secret: str, length: int = 12) -> str:
