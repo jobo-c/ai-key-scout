@@ -47,6 +47,28 @@ ENV_NAMES = {
     "dashscope": "DASHSCOPE_API_KEY",
 }
 
+OPENAI_COMPATIBLE_NPM = {
+    "openrouter": "@ai-sdk/openai-compatible",
+    "deepseek": "@ai-sdk/openai-compatible",
+    "groq": "@ai-sdk/groq",
+    "openai": "@ai-sdk/openai",
+    "anthropic": "@ai-sdk/anthropic",
+    "google": "@ai-sdk/google",
+    "mistral": "@ai-sdk/mistral",
+    "xai": "@ai-sdk/openai-compatible",
+    "together": "@ai-sdk/openai-compatible",
+    "fireworks": "@ai-sdk/openai-compatible",
+    "cohere": "@ai-sdk/openai-compatible",
+    "perplexity": "@ai-sdk/openai-compatible",
+    "deepinfra": "@ai-sdk/openai-compatible",
+    "siliconflow": "@ai-sdk/openai-compatible",
+    "nebius": "@ai-sdk/openai-compatible",
+    "hyperbolic": "@ai-sdk/openai-compatible",
+    "cerebras": "@ai-sdk/openai-compatible",
+    "sambanova": "@ai-sdk/openai-compatible",
+    "nvidia": "@ai-sdk/openai-compatible",
+}
+
 # Hermes first-class provider IDs. Providers not listed here can still be exported
 # as OpenCode custom providers when they expose an OpenAI-compatible chat endpoint.
 HERMES_IDS = {
@@ -183,15 +205,19 @@ def write_opencode(records: Iterable[Any], directory: str, limit: int = 1) -> Tu
         env = _env_name(pid)
         env_lines.append(f"{env}={r.key}")
         model = _best_model(r)
+        npm = OPENAI_COMPATIBLE_NPM.get(pid, "@ai-sdk/openai-compatible")
         cfg = {
-            "npm": "@ai-sdk/openai-compatible",
+            "npm": npm,
             "name": str(getattr(r, "provider", pid)),
             "options": {"apiKey": "{env:" + env + "}"},
             "models": {model: {"name": model}},
         }
-        base = _base_url(PROVIDERS.get(pid, {}))
-        if base:
-            cfg["options"]["baseURL"] = base
+        # Native AI SDK providers know their endpoint; custom/OpenAI-compatible
+        # providers need the discovered base URL.
+        if npm == "@ai-sdk/openai-compatible":
+            base = _base_url(PROVIDERS.get(pid, {}))
+            if base:
+                cfg["options"]["baseURL"] = base
         providers[pid] = cfg
     payload = {
         "$schema": "https://opencode.ai/config.json",
