@@ -114,7 +114,19 @@ def select_best(records: Iterable[Any], limit: int = 1) -> List[Any]:
         float(getattr(r, "score", 0) or 0),
         float(getattr(r, "remaining", -1) if getattr(r, "remaining", None) is not None else -1),
     ), reverse=True)
-    return candidates[:max(1, int(limit))]
+    # One credential per provider prevents two OpenRouter (or other same-provider)
+    # records from overwriting the same environment variable/config entry.
+    out: List[Any] = []
+    seen: set[str] = set()
+    for r in candidates:
+        pid = str(getattr(r, "provider", "")).lower()
+        if pid in seen:
+            continue
+        seen.add(pid)
+        out.append(r)
+        if len(out) >= max(1, int(limit)):
+            break
+    return out
 
 def _yaml_quote(value: str) -> str:
     return json.dumps(str(value), ensure_ascii=False)
