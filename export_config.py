@@ -46,6 +46,21 @@ ENV_NAMES = {
     "nous": "NOUS_API_KEY",
     "novita": "NOVITA_API_KEY",
     "dashscope": "DASHSCOPE_API_KEY",
+    "firecrawl": "FIRECRAWL_API_KEY",
+    "browser_use": "BROWSER_USE_API_KEY",
+    "browserless": "BROWSERLESS_TOKEN",
+    "apify": "APIFY_API_TOKEN",
+    "serper": "SERPER_API_KEY",
+    "exa": "EXA_API_KEY",
+    "scrapingbee": "SCRAPINGBEE_API_KEY",
+    "scraperapi": "SCRAPERAPI_API_KEY",
+    "brightdata": "BRIGHTDATA_API_KEY",
+    "deepgram": "DEEPGRAM_API_KEY",
+    "assemblyai": "ASSEMBLYAI_API_KEY",
+    "pinecone": "PINECONE_API_KEY",
+    "fal": "FAL_KEY",
+    "unstructured": "UNSTRUCTURED_API_KEY",
+    "modal": "MODAL_TOKEN_ID",
 }
 
 OPENAI_COMPATIBLE_NPM = {
@@ -197,6 +212,42 @@ def write_hermes(records: Iterable[Any], directory: str, limit: int = 1) -> Tupl
     return cfg_path, env_path, len(selected)
 
 
+
+
+def write_ai_tools(records: Iterable[Any], directory: str) -> Tuple[str, List[str]]:
+    """Export verified non-LLM AI tools/agent services without embedding secrets."""
+    tools = []
+    env_values: List[str] = []
+    for r in records:
+        if getattr(r, "status", "") != "valid":
+            continue
+        pid = str(getattr(r, "provider", "")).lower()
+        cfg = PROVIDERS.get(pid) or {}
+        if cfg.get("provider_kind") != "tool":
+            continue
+        env = _env_name(pid)
+        details = getattr(r, "details", {}) or {}
+        tools.append({
+            "provider": pid,
+            "name": cfg.get("name", pid),
+            "api_key_env": env,
+            "category": cfg.get("category", "ai_tool"),
+            "capabilities": list(cfg.get("capabilities") or []),
+            "status": r.status,
+            "score": float(getattr(r, "score", 0) or 0),
+            "info": getattr(r, "info", "") or "",
+            "latency_ms": details.get("latency_ms"),
+            "rate_limit": details.get("rate_limit") or {},
+            "details": {k: v for k, v in details.items()
+                        if k not in ("raw", "score_breakdown")},
+        })
+        env_values.append(f"{env}={r.key}")
+    path = os.path.join(directory, "ai-tools.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"generated_by": "AI Key Scout v5.2", "tools": tools,
+                   "env_file": ".env"}, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    return path, env_values
 
 def write_extra_configs(records: Iterable[Any], directory: str, limit: int = 10) -> Dict[str, str]:
     """Write additional environment-backed interoperability configs."""
@@ -350,6 +401,12 @@ def write_bundle(records: Iterable[Any], directory: str, limit: int = 1) -> Dict
         pass
 
     extras = write_extra_configs(selected, directory, limit=len(selected))
+    tool_path, tool_env = write_ai_tools(records, directory)
+    extras["ai_tools"] = tool_path
+    if tool_env:
+        with open(env_path, "a", encoding="utf-8") as f:
+            for line in tool_env:
+                f.write(line + "\n")
 
     return {
         "directory": directory,
