@@ -36,3 +36,5 @@ exports/
 # Local model/provider state
 models.json
 model_cache/
+
+history.json
