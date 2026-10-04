@@ -230,7 +230,7 @@ def format_working_json(records) -> Dict[str, Any]:
     return {
         "tool": "AI Key Scout v4",
         "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "keys": len({r["key"] for r in rows}),
+        "keys": len({r["fingerprint"] for r in rows}),
         "working_models": len(rows),
         "records": rows,
     }
