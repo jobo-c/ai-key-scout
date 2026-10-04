@@ -537,12 +537,23 @@ class MainWindow(QMainWindow):
             elif clicked is open_btn:
                 result = write_opencode(eligible, directory, limit)
                 msg = f"OpenCode exported.\\nopencode.json: {result[0]}\\n.env: {result[1]}\\nkeys: {result[2]}"
-            else:
+            elif clicked is both_btn:
                 result = write_bundle(eligible, directory, limit)
                 msg = (
-                    "Both formats exported.\\n\\n"
+                    "Hermes + OpenCode exported.\\n\\n"
                     f"Hermes: {result['hermes'][0]}\\n"
                     f"OpenCode: {result['opencode'][0]}\\n"
+                    f"Verified keys: {result['count']}\\n\\n"
+                    "Keep the generated .env files private."
+                )
+            else:
+                result = write_bundle(eligible, directory, limit)
+                extra = result.get("extras") or {}
+                msg = (
+                    "Full bundle exported.\\n\\n"
+                    f"Hermes: {result['hermes'][0]}\\n"
+                    f"OpenCode: {result['opencode'][0]}\\n"
+                    f"Extra configs: {', '.join(os.path.basename(p) for p in extra.values())}\\n"
                     f"Verified keys: {result['count']}\\n\\n"
                     "Keep the generated .env files private."
                 )
