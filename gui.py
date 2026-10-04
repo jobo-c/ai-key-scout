@@ -1265,6 +1265,83 @@ class MainWindow(QMainWindow):
         ]
         self.detail.setPlainText("\n".join(lines))
 
+    def save_history(self):
+        """Merge the current in-memory records into persistent history.json."""
+        try:
+            data = key_history.load_history()
+            added = key_history.merge_records(data, self.store.all())
+            path = key_history.save_history(data)
+            self._set_status(
+                f"History saved · {len(self.store.all())} current keys · "
+                f"{added} new → {os.path.basename(path)}"
+            )
+            log.info("History saved path=%s new_keys=%d total=%d",
+                     path, added, len(data.get("keys", {})))
+        except Exception as e:
+            log.exception("Failed to save history")
+            QMessageBox.warning(self, "Save history", f"Could not save history:\n{e}")
+
+    def load_history(self):
+        """Load persistent history.json into the current key store."""
+        try:
+            data = key_history.load_history()
+            rows = data.get("keys") or {}
+            if not isinstance(rows, dict):
+                rows = {}
+
+            loaded = 0
+            for key, row in rows.items():
+                if not isinstance(row, dict) or not key:
+                    continue
+                provider = str(row.get("provider") or "unknown")
+                rec = self.store.add(
+                    str(key),
+                    provider,
+                    source="history",
+                )
+
+                # Restore useful persisted check/model information without
+                # replacing newer in-memory values with empty history fields.
+                sources = row.get("sources") or []
+                if isinstance(sources, (list, tuple, set)):
+                    rec.sources.update(str(s) for s in sources if s)
+
+                for attr in ("status", "remaining", "balance_summary", "score", "info"):
+                    value = row.get(attr)
+                    if value is not None and value != "":
+                        try:
+                            setattr(rec, attr, value)
+                        except Exception:
+                            pass
+
+                models = row.get("models")
+                if isinstance(models, list):
+                    rec.models = list(dict.fromkeys(str(x) for x in models if x))
+
+                working = row.get("working_models")
+                if isinstance(working, list):
+                    rec.working_models = list(dict.fromkeys(
+                        str(x) for x in working if x
+                    ))
+
+                details = row.get("details")
+                if isinstance(details, dict):
+                    rec.details = dict(details)
+
+                loaded += 1
+
+            self._request_ui_refresh()
+            self._ui_dirty = True
+            self._set_status(
+                f"History loaded · {loaded} keys · "
+                f"{len(data.get('keys', {}))} stored records"
+            )
+            log.info("History loaded path=%s records=%d",
+                     key_history.history_path(), loaded)
+        except Exception as e:
+            log.exception("Failed to load history")
+            QMessageBox.warning(self, "Load history", f"Could not load history:\n{e}")
+
     def copy_selected_key(self):
         if not self._selected_key:
             return
