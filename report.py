@@ -27,7 +27,10 @@ from __future__ import annotations
 import json
 import os
 import time
-from typing import Any, Dict, List, Optional, Tuple\n\nfrom security import fingerprint, mask_secret\n
+from typing import Any, Dict, List, Optional, Tuple
+
+from security import fingerprint, mask_secret
+
 
 WORKING_TXT = "working_keys.txt"
 WORKING_JSON = "working_keys.json"
