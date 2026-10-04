@@ -423,6 +423,22 @@ class CheckWorker(QThread):
             return payload
         return last
 
+    def _emit(self, key: str, provider: str, payload: dict):
+        """Normalize a provider payload and publish one result to the GUI."""
+        if not isinstance(payload, dict):
+            payload = {"valid": False, "state": "unknown", "error": "invalid provider payload"}
+        state = payload.get("state")
+        if not state:
+            state = "valid" if payload.get("valid") else "invalid"
+            payload["state"] = state
+        payload.setdefault("provider", provider)
+        payload.setdefault("models", [])
+        payload.setdefault("details", {})
+        payload.setdefault("remaining", None)
+        payload.setdefault("balance_summary", "")
+        payload.setdefault("info", "")
+        self.result.emit(key, payload)
+
     def run(self):
         asyncio.run(self._run())
 
@@ -500,4 +516,59 @@ class CheckWorker(QThread):
                     async with deep_sem:
                         if self._stop:
                             return
-                        th = throttles.setdefault(provider, AdaptiveThrottle(PROVIDER_MIN_INTERVAL.get(provider, 0.05)))
+                        th = throttles.setdefault(
+                            provider,
+                            AdaptiveThrottle(PROVIDER_MIN_INTERVAL.get(provider, 0.05)),
+                        )
+                        await th.wait()
+                        try:
+                            payload = await check_provider(
+                                session,
+                                key,
+                                provider,
+                                timeout=self.timeout,
+                                proxy=self.proxy,
+                                light=False,
+                            )
+                        except Exception as e:
+                            payload = {
+                                "valid": False,
+                                "state": "unknown",
+                                "error": f"enrichment exception: {str(e)[:160]}",
+                                "remaining": None,
+                                "balance_summary": "",
+                                "details": {},
+                                "models": [],
+                                "info": "",
+                            }
+
+                        state = payload.get("state") or (
+                            "valid" if payload.get("valid") else "invalid"
+                        )
+                        # Never downgrade a key that already passed the cheap sweep
+                        # because a deep/balance endpoint is temporarily unavailable.
+                        if state in ("valid", "valid_no_funds"):
+                            self._emit(key, provider, payload)
+                            th.ok()
+                        elif state == "rate_limited":
+                            th.rate_limited()
+                        enriched += 1
+                        if enriched % 10 == 0 or enriched == n:
+                            self.status.emit(f"Enriching… {enriched}/{n}")
+
+                enrich_chunk = max(8, deep_sem._value * 4)
+                for i in range(0, len(valid_items), enrich_chunk):
+                    if self._stop:
+                        break
+                    part = valid_items[i:i + enrich_chunk]
+                    await asyncio.gather(*(enrich(k, p) for k, p in part))
+
+        if not self._stop:
+            self.status.emit(f"Check complete · {done}/{total} checked · ok={ok_n} bad={bad_n}")
+        else:
+            self.status.emit(f"Check stopped · {done}/{total} checked")
+        log.info(
+            "CheckWorker finished done=%s ok=%s bad=%s enriched=%s stopped=%s",
+            done, ok_n, bad_n, enriched if 'enriched' in locals() else 0, self._stop,
+        )
+        self.finished_ok.emit()
