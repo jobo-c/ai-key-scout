@@ -1226,13 +1226,13 @@ class MainWindow(QMainWindow):
             f"Info     : {r.info or '—'}",
             f"Error    : {r.error or '—'}",
             f"Sources  : {'; '.join(sorted(r.sources))}",
-            f"Key      : {r.key}",
+            f"Key      : {mask_secret(r.key)} (fingerprint {fingerprint(r.key)})",
             "",
             "Found in line(s):",
         ]
         if r.context_lines:
             for i, ln in enumerate(r.context_lines, 1):
-                lines.append(f"  [{i}] {ln}")
+                lines.append(f"  [{i}] {redact_text(ln)}")
         else:
             lines.append("  (no line context captured)")
         lines += [
