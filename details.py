@@ -14,6 +14,26 @@ import aiohttp
 from providers import PROVIDERS
 
 
+def _response_rate_metadata(headers: Optional[dict]) -> Dict[str, Any]:
+    """Normalize common rate-limit headers without retaining unrelated response headers."""
+    if not headers:
+        return {}
+    aliases = {
+        "limit": ("x-ratelimit-limit", "ratelimit-limit"),
+        "remaining": ("x-ratelimit-remaining", "ratelimit-remaining"),
+        "reset": ("x-ratelimit-reset", "ratelimit-reset"),
+        "retry_after": ("retry-after",),
+    }
+    out: Dict[str, Any] = {}
+    lower = {str(k).lower(): str(v) for k, v in headers.items()}
+    for name, keys in aliases.items():
+        for key in keys:
+            if key in lower:
+                out[name] = lower[key]
+                break
+    return out
+
+
 def _parse_retry_after(headers) -> Optional[float]:
     """Parse an HTTP Retry-After header (seconds or HTTP-date) -> float seconds, or None."""
     if not headers:
@@ -656,7 +676,7 @@ async def check_provider(
     result["state"] = STATE_VALID
     result.setdefault("error", "")
     result.setdefault("details", {})
-    result["details"]["has_balance"] = bool(cfg.get("has_balance"))
+    result["details"]["has_balance"] = bool(cfg.get("has_balance"))\n    result["details"]["http_status"] = status\n    result["details"]["latency_ms"] = latency_ms\n    result["details"]["rate_limit"] = _response_rate_metadata(validate_headers)\n    result["details"]["provider_kind"] = cfg.get("provider_kind", "llm")\n    result["details"]["capabilities"] = list(cfg.get("capabilities") or [])
     if auth_note:
         result["details"]["auth_note"] = auth_note
         result["info"] = (result.get("info") + " | " if result.get("info") else "") + auth_note
