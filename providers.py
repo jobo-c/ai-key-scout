@@ -1,4 +1,7 @@
-"""Provider registry: patterns, validate endpoints, detail capabilities."""
+"""Provider registry: patterns, validation endpoints, detail capabilities."""
+
+# AI tool/agent APIs live in a separate registry so they can evolve without
+# turning the LLM provider table into an unmaintainable monolith.
 
 from __future__ import annotations
 
@@ -627,6 +630,10 @@ PROVIDERS: Dict[str, Dict[str, Any]] = {
 }
 
 
+# Merge non-LLM AI tools/agent services before building detection order.
+from plugin_providers import PLUGIN_PROVIDERS
+PROVIDERS.update(PLUGIN_PROVIDERS)
+
 # ---------------------------------------------------------------------------
 # Chat specs: how to ask a provider "hi" and prove the key really serves a model.
 # Kept as a separate table so the endpoint/pattern definitions above stay readable.
@@ -846,6 +853,24 @@ def _force_provider(key: str) -> Optional[str]:
         return "tavily"
     if key.startswith("pa-"):
         return "voyage"
+    if key.startswith("fc-"):
+        return "firecrawl"
+    if key.startswith("bu_"):
+        return "browser_use"
+    if key.startswith("bless_"):
+        return "browserless"
+    if key.startswith("apify_api_"):
+        return "apify"
+    if key.startswith("exa_"):
+        return "exa"
+    if key.startswith("brd_"):
+        return "brightdata"
+    if key.startswith("pcsk_"):
+        return "pinecone"
+    if key.startswith("fal_"):
+        return "fal"
+    if key.startswith("ak-"):
+        return "modal"
     if key.startswith("lsv2_pt_") or key.startswith("ls__"):
         return "langsmith"
     if key.startswith("sk_live_") or key.startswith("sk_test_"):
@@ -899,6 +924,15 @@ _LABELED_PROVIDER_PATTERNS = {
     "groq": re.compile(r"(?i)GROQ(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
     "cerebras": re.compile(r"(?i)CEREBRAS(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
     "perplexity": re.compile(r"(?i)PERPLEXITY(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "firecrawl": re.compile(r"\bfc-[A-Za-z0-9_-]{16,}\b"),
+    "browser_use": re.compile(r"\bbu_[A-Za-z0-9_-]{20,}\b"),
+    "browserless": re.compile(r"\bbless_[A-Za-z0-9_-]{12,}\b"),
+    "apify": re.compile(r"\bapify_api_[A-Za-z0-9_-]{20,}\b"),
+    "exa": re.compile(r"\bexa_[A-Za-z0-9_-]{16,}\b"),
+    "brightdata": re.compile(r"\bbrd_[A-Za-z0-9_-]{16,}\b"),
+    "pinecone": re.compile(r"\bpcsk_[A-Za-z0-9_-]{16,}\b"),
+    "fal": re.compile(r"\bfal_[A-Za-z0-9_-]{16,}\b"),
+    "modal": re.compile(r"\bak-[A-Za-z0-9_-]{12,}\b"),
     "openrouter": re.compile(r"(?i)OPENROUTER(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
 }
 _LABELED_HINTS = tuple(x.pattern.split("\\s")[0].replace("(?i)", "") for x in _LABELED_PROVIDER_PATTERNS.values())
@@ -1120,7 +1154,7 @@ def discovery_order(exclude: Optional[List[str]] = None) -> List[str]:
             continue
         if cfg.get("patterns"):
             continue  # already covered by detection
-        if not cfg.get("validate"):
+        if not cfg.get("validate") or cfg.get("discoverable") is False:
             continue
         out.append(pid)
     return out
@@ -1140,7 +1174,9 @@ def alternative_candidates(key: str, exclude: Optional[List[str]] = None) -> Lis
     forced = _force_provider(key)
     unmistakable = {"openrouter", "anthropic", "google", "groq", "huggingface",
                     "replicate", "perplexity", "xai", "fireworks", "cerebras",
-                    "github", "nvidia", "jina", "tavily", "langsmith", "voyage"}
+                    "github", "nvidia", "jina", "tavily", "langsmith", "voyage",
+                    "firecrawl", "browser_use", "browserless", "apify", "exa",
+                    "brightdata", "pinecone", "fal", "modal"}
     if forced in unmistakable:
         return []
     out: List[str] = []
