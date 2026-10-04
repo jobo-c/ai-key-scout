@@ -110,7 +110,7 @@ class SettingsDialog(QDialog):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"AI Key Scout v{__version__}")
+        self.setWindowTitle(f"AI Key Scout v{package_info.__version__}")
         self.resize(1180, 760)
 
         self.store = KeyStore()
