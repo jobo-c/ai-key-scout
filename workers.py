@@ -272,6 +272,7 @@ class ModelTestWorker(QThread):
         timeout: float = 15.0,
         proxy: str = "",
         models_per_key: int = 3,
+        test_paid: bool = False,
     ):
         super().__init__()
         self.items = items
@@ -279,6 +280,7 @@ class ModelTestWorker(QThread):
         self.timeout = timeout
         self.proxy = (proxy or "").strip() or None
         self.models_per_key = max(1, models_per_key)
+        self.test_paid = bool(test_paid)
         self._stop = False
 
     def stop(self):
@@ -306,6 +308,7 @@ class ModelTestWorker(QThread):
                     res = await test_models_concurrent(
                         session, key, provider, catalog=catalog,
                         limit=self.models_per_key, timeout=self.timeout, proxy=self.proxy,
+                        test_paid=self.test_paid,
                     )
                 except Exception as e:
                     res = {"tested": [], "working": [], "note": f"error: {str(e)[:100]}"}
@@ -319,8 +322,8 @@ class ModelTestWorker(QThread):
                 if done % 10 == 0 or done == total:
                     self.status.emit(f"Model test… {done}/{total} (working={worked})")
 
-        log.info("ModelTestWorker start items=%d concurrency=%d models_per_key=%d",
-                 total, self.concurrency, self.models_per_key)
+        log.info("ModelTestWorker start items=%d concurrency=%d models_per_key=%d test_paid=%s",
+                 total, self.concurrency, self.models_per_key, self.test_paid)
         async with aiohttp.ClientSession(connector=connector, trust_env=True, timeout=timeout) as session:
             chunk = max(self.concurrency * 4, 16)
             for i in range(0, len(self.items), chunk):
@@ -498,111 +501,3 @@ class CheckWorker(QThread):
                         if self._stop:
                             return
                         th = throttles.setdefault(provider, AdaptiveThrottle(PROVIDER_MIN_INTERVAL.get(provider, 0.05)))
-                        await th.wait()
-                        try:
-                            payload = await check_provider(
-                                session, key, provider,
-                                timeout=self.timeout, proxy=self.proxy,
-                                light=False, discover=False,
-                            )
-                        except Exception as e:
-                            log.warning("enrich failed %s: %s", provider, str(e)[:120])
-                            return
-                        if not payload.get("valid"):
-                            # Never downgrade a key that already validated — a failed
-                            # enrichment just means less metadata.
-                            return
-                        payload = await self._second_opinion(session, key, provider, payload)
-                        self._emit(key, provider, payload)
-                        enriched += 1
-                        self.status.emit(f"Enriching… {enriched}/{n}")
-
-                await asyncio.gather(*(enrich(k, p) for k, p in valid_items))
-
-        log.info("CheckWorker finished done=%s ok=%s bad=%s enriched=%s",
-                 done, ok_n, bad_n, len(valid_items) if self.light else 0)
-        self.finished_ok.emit()
-
-    async def _second_opinion(self, session, key: str, provider: str, payload: dict) -> dict:
-        """Re-home a key whose assigned provider gave a valid but empty answer.
-
-        DeepSeek reports "$0 / not available" and no catalog for the ~100 keys
-        whose sk-32 shape it claims; several of those are Moonshot / SiliconFlow /
-        DashScope keys. If the first answer carries no positive signal, try the
-        other providers whose shape also matches and keep the richest one.
-        """
-        d = payload.get("details") or {}
-        rem = payload.get("remaining")
-        has_signal = (
-            bool(payload.get("models"))
-            or bool(d.get("model_count"))
-            or d.get("org_usage_visible")
-            or (rem is not None and float(rem) > 0)
-        )
-        if has_signal:
-            return payload
-        candidates = alternative_candidates(key, exclude=[provider])
-        if not candidates:
-            return payload
-        best = payload
-        best_score = self._signal_score(payload)
-        for cand in candidates[:4]:
-            if self._stop:
-                break
-            try:
-                res = await check_provider(
-                    session, key, cand,
-                    timeout=self.timeout, proxy=self.proxy, light=False, discover=False,
-                )
-            except Exception:
-                continue
-            if not res.get("valid"):
-                continue
-            sc = self._signal_score(res)
-            if sc > best_score:
-                best, best_score = res, sc
-                log.info("Re-homed %s from %s → %s", key[:10] + "…", provider, cand)
-        if best is not payload:
-            best.setdefault("details", {})["rehomed_from"] = provider
-            best["info"] = (best.get("info") or "") + f" | re-homed from {provider}"
-        return best
-
-    @staticmethod
-    def _signal_score(payload: dict) -> float:
-        d = payload.get("details") or {}
-        rem = payload.get("remaining")
-        sc = 0.0
-        if rem is not None:
-            sc += 1.0 + min(float(rem), 50.0)
-        if d.get("model_count"):
-            sc += 2.0
-        if d.get("org_usage_visible"):
-            sc += 3.0
-        sc += min(len(payload.get("models") or []), 5) * 0.5
-        if d.get("is_available") is False:
-            sc -= 2.0
-        return sc
-
-    def _emit(self, key: str, provider: str, payload: dict):
-        """Normalise a provider payload into a KeyRecord-shaped dict and emit it."""
-        state = payload.get("state") or ("valid" if payload.get("valid") else "invalid")
-        if state in ("valid", "valid_no_funds"):
-            status = "valid"
-        elif state == "rate_limited":
-            status = "rate_limited"
-        elif state == "unknown":
-            status = "unknown"
-        else:
-            status = "invalid"
-        details = payload.get("details") or {}
-        details["state"] = state
-        rec = KeyRecord(key=key, provider=provider)
-        rec.status = status
-        rec.remaining = payload.get("remaining")
-        rec.balance_summary = payload.get("balance_summary") or ""
-        rec.details = details
-        rec.models = payload.get("models") or []
-        rec.info = payload.get("info") or ""
-        rec.error = payload.get("error") or ""
-        payload["score"] = score_record(rec)
-        self.result.emit(key, payload)
