@@ -102,3 +102,25 @@ Before opening a pull request, test the scanner and model verification against s
 ## License
 
 See the repository license file for the project's licensing terms.
+
+## v5 security model
+
+v5 is designed around **authorized credential auditing** and keeps credentials out
+of normal reports and logs.
+
+- Stable SHA-256 fingerprints identify credentials without storing the raw value in reports.
+- UI/report output uses masked credentials such as `sk-a…1234`.
+- Generated credential/result files are ignored by Git.
+- `working_keys.json` and similar generated credential artifacts are intentionally local-only.
+- Paid model inference remains opt-in because it can consume account credits.
+- Provider authentication and model capability testing are reported separately.
+- CI compiles the project and runs the security regression tests.
+
+### v5 result model
+
+A verified result can now distinguish:
+
+`discovered → provider identified → authenticated → model tested → free/paid capability → ranked`
+
+This makes the project useful as a provider capability benchmark for authorized
+Hermes/OpenCode configuration rather than only a key detector.
