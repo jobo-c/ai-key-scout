@@ -413,10 +413,12 @@ def summarise(result: Dict[str, Any]) -> str:
         for r in tested:
             if not r.get("ok"):
                 continue
+            tier = r.get("tier") or "unknown"
+            tag = f"[{tier}]"
             if r.get("text"):
-                bits.append(f"{r['model']} → {r.get('reply','')!r} ({r.get('latency_ms')}ms)")
+                bits.append(f"{r['model']} {tag} → {r.get('reply','')!r} ({r.get('latency_ms')}ms)")
             else:
-                bits.append(f"{r['model']} → ran, no visible text ({r.get('latency_ms')}ms)")
+                bits.append(f"{r['model']} {tag} → ran, no visible text ({r.get('latency_ms')}ms)")
         return "WORKS: " + " · ".join(bits)
     if result.get("note"):
         return f"not tested: {result['note']}"
