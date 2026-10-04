@@ -228,7 +228,7 @@ class _Rec:
 def format_working_json(records) -> Dict[str, Any]:
     rows = working_rows(records)
     return {
-        "tool": "AI Key Scout v4",
+        "tool": "AI Key Scout v5",
         "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
         "keys": len({r["fingerprint"] for r in rows}),
         "working_models": len(rows),
