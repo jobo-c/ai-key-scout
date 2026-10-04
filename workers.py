@@ -71,6 +71,7 @@ _KEY_MARKERS = (
     b"ls__",
     b"sk_",
     b"pa-",
+    b"fc-", b"bu_", b"bless_", b"apify_api_", b"exa_", b"brd_", b"pcsk_", b"fal_", b"ak-",
     b"sk-",  # DeepSeek / legacy OpenAI — last so distinctive prefixes win line-dedupe first
 )
 
