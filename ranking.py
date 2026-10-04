@@ -7,6 +7,7 @@ from typing import List, Optional
 
 from .models_store import KeyRecord
 from .providers import provider_name
+from .security import fingerprint, mask_secret
 
 
 def score_record(rec: KeyRecord) -> float:
@@ -118,7 +119,7 @@ def _money(v: Optional[float], digits: int = 2) -> str:
 def format_best_report(records: List[KeyRecord], min_remaining: float = 0.01) -> str:
     ranked = sort_best([r for r in records if is_best_candidate(r, min_remaining)])
     lines = [
-        "# AI Key Scout v4 — Best Accounts (ranked)",
+        # AI Key Scout v5 — Best Accounts (ranked),
         f"# Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         f"# Min remaining filter: {_money(min_remaining)}",
         "#" + "=" * 60,
@@ -130,7 +131,7 @@ def format_best_report(records: List[KeyRecord], min_remaining: float = 0.01) ->
     for i, r in enumerate(ranked, 1):
         rem_s = _money(r.remaining) if r.remaining is not None else "unknown"
         lines.append(f"#{i}  remaining: {rem_s}  score: {r.score:.1f}")
-        lines.append(r.key)
+        lines.append(f"    Credential: {mask_secret(r.key)}  (fingerprint: {fingerprint(r.key)})")
         lines.append(f"    Provider:  {provider_name(r.provider)} ({r.provider})")
         lines.append(f"    Status:    {r.status}")
         if r.balance_summary:
