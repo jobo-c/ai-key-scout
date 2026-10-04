@@ -22,6 +22,32 @@ PROVIDERS: Dict[str, Dict[str, Any]] = {
         # Used to seed the "say hi" model test with real, currently-served ids.
         "models_url": "https://openrouter.ai/api/v1/models",
     },
+    "nous": {
+        "name": "Nous Research / Nous Portal",
+        "priority": 87,
+        "patterns": [],
+        "headers": lambda k: {"Authorization": f"Bearer {k}"},
+        "validate": {
+            "method": "GET",
+            "url": "https://inference-api.nousresearch.com/v1/models",
+            "ok": [200],
+        },
+        "detail": "openai_models",
+        "models_url": "https://inference-api.nousresearch.com/v1/models",
+        "probe": {
+            "method": "POST",
+            "url": "https://inference-api.nousresearch.com/v1/chat/completions",
+            "ok": [200],
+            "json": {
+                "model": "Hermes-4-70B",
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+        },
+        "probe_models": ["Hermes-4-70B", "Hermes-4-405B"],
+        "has_balance": True,
+        "weak_pattern": True,
+    },
     "anthropic": {
         "name": "Anthropic",
         "priority": 95,
@@ -857,6 +883,7 @@ surrounding configuration explicitly names the provider, avoiding arbitrary
 20+ character strings being treated as credentials.
 """
 _LABELED_PROVIDER_PATTERNS = {
+    "nous": re.compile(r"(?i)(?:NOUS|NOUSRESEARCH)(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
     "cohere": re.compile(r"(?i)COHERE(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
     "deepinfra": re.compile(r"(?i)DEEPINFRA(?:_API)?_(?:KEY|TOKEN)\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
     "sambanova": re.compile(r"(?i)SAMBANOVA(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
