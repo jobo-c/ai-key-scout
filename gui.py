@@ -82,8 +82,12 @@ class SettingsDialog(QDialog):
         form.addRow("", self.testmodels)
         self.perkey = QSpinBox(); self.perkey.setRange(1, 8)
         self.perkey.setValue(int(settings.get("models_per_key", 3)))
-        self.perkey.setToolTip("How many models to try per key (stops early once one answers)")
+        self.perkey.setToolTip("How many models to try per key")
         form.addRow("Models tested / key", self.perkey)
+        self.paid = QCheckBox("Also test paid models (may consume account credits)")
+        self.paid.setChecked(bool(settings.get("test_paid_models", False)))
+        self.paid.setToolTip("Free models are tested first. Paid inference is never used unless this is enabled.")
+        form.addRow("Paid model testing", self.paid)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -99,6 +103,7 @@ class SettingsDialog(QDialog):
             "enrich_valid": self.enrich.isChecked(),
             "test_models": self.testmodels.isChecked(),
             "models_per_key": self.perkey.value(),
+            "test_paid_models": self.paid.isChecked(),
         }
 
 
@@ -112,7 +117,8 @@ class MainWindow(QMainWindow):
         # max_mb 0 = no size skip (v2 read-whole-file + regex)
         self.settings = {"concurrency": 40, "timeout": 10, "max_mb": 0, "proxy": "",
                          "deep_check": False, "enrich_valid": True,
-                         "test_models": False, "models_per_key": 3}
+                         "test_models": False, "models_per_key": 3,
+                         "test_paid_models": False}
         self.scan_worker: Optional[ScanWorker] = None
         self.check_worker: Optional[CheckWorker] = None
         self.model_worker: Optional[ModelTestWorker] = None
@@ -810,6 +816,7 @@ class MainWindow(QMainWindow):
             timeout=float(max(self.settings["timeout"], 15)),
             proxy=self.settings.get("proxy", ""),
             models_per_key=int(self.settings.get("models_per_key", 3)),
+            test_paid=bool(self.settings.get("test_paid_models", False)),
         )
         self.model_worker.result.connect(self.on_model_result)
         self.model_worker.progress.connect(lambda d, t: self.check_prog.setValue(d))
@@ -826,6 +833,9 @@ class MainWindow(QMainWindow):
         details = rec.details or {}
         details["model_tests"] = payload.get("tested") or []
         details["model_test_note"] = payload.get("note") or ""
+        details["free_working"] = payload.get("free_working") or []
+        details["paid_working"] = payload.get("paid_working") or []
+        details["paid_testing"] = bool(payload.get("paid_testing"))
         rec.details = details
         working = payload.get("working") or []
         # Merge rather than clobber, so re-testing only ever adds knowledge.
@@ -1198,113 +1208,3 @@ class MainWindow(QMainWindow):
         if not r:
             return
         QApplication.clipboard().setText(
-            f"{r.key}\n{provider_name(r.provider)} | {r.balance_summary} | remaining={r.remaining}"
-        )
-        self._set_status("Summary copied")
-
-    # ---------- export ----------
-    def _autosave_history(self, reason: str = ""):
-        try:
-            data = key_history.load_history()
-            added = key_history.merge_records(data, self.store.all())
-            path = key_history.save_history(data)
-            log.info(
-                "History autosave (%s): +%d new · total=%d → %s",
-                reason, added, len(data.get("keys") or {}), path,
-            )
-        except Exception as e:
-            log.warning("History autosave failed: %s", e)
-
-    def save_history(self):
-        if len(self.store) == 0:
-            QMessageBox.information(self, "History", "No keys in the table to save.")
-            return
-        data = key_history.load_history()
-        added = key_history.merge_records(data, self.store.all())
-        path = key_history.save_history(data)
-        self._set_status(f"History saved (+{added} new) → {path}")
-        QMessageBox.information(
-            self, "History",
-            f"Saved to history.json\n+{added} new keys\nTotal stored: {len(data.get('keys') or {})}\n\n{path}",
-        )
-
-    def load_history(self):
-        path = key_history.history_path()
-        data = key_history.load_history(path)
-        keys_map = data.get("keys") or {}
-        if not keys_map:
-            QMessageBox.information(self, "History", f"No keys in history yet.\n{path}")
-            return
-        added = 0
-        for key, row in keys_map.items():
-            before = len(self.store)
-            prov = row.get("provider") or "generic"
-            if prov not in PROVIDERS:
-                from .providers import detect_provider_for_key
-                prov = detect_provider_for_key(key) or "openrouter"
-            rec = self.store.add(key, prov, source="history.json")
-            if len(self.store) > before:
-                added += 1
-            # restore last known check fields
-            if row.get("status"):
-                rec.status = row["status"]
-            if row.get("remaining") is not None:
-                rec.remaining = row["remaining"]
-            if row.get("balance_summary"):
-                rec.balance_summary = row["balance_summary"]
-            if row.get("score"):
-                rec.score = float(row["score"])
-            if row.get("info"):
-                rec.info = row["info"]
-            if row.get("models"):
-                rec.models = list(row["models"])
-            if row.get("working_models"):
-                rec.working_models = list(row["working_models"])
-            if row.get("details"):
-                rec.details = dict(row["details"])
-            for s in row.get("sources") or []:
-                rec.sources.add(s)
-        self._rebuild_provider_filter()
-        self.refresh_lists()
-        self._set_status(f"Loaded history · +{added} new · store={len(self.store)} · file has {len(keys_map)}")
-        log.info("Loaded history from %s (+%d new, file=%d)", path, added, len(keys_map))
-
-    def export_best(self):
-        records = self.store.all()
-        if not any(r.status == "valid" for r in records):
-            QMessageBox.information(self, "Export", "No checked/valid keys yet. Run Check keys first.")
-            return
-        out_dir = os.path.dirname(os.path.abspath(__file__))
-        out_dir = os.path.dirname(out_dir)  # v4/
-        txt_path = os.path.join(out_dir, "best_keys.txt")
-        json_path = os.path.join(out_dir, "best_keys.json")
-        csv_path = os.path.join(out_dir, "all_results.csv")
-        report = format_best_report(records, min_remaining=self.min_rem.value())
-        with open(txt_path, "w", encoding="utf-8") as f:
-            f.write(report + "\n")
-        best = [r for r in sort_best(records) if is_best_candidate(r, self.min_rem.value())]
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump([r.to_dict() for r in best], f, indent=2)
-        with open(csv_path, "w", newline="", encoding="utf-8") as f:
-            w = csv.writer(f)
-            w.writerow(["key", "provider", "status", "remaining", "score",
-                        "summary", "info", "models_count", "working_models",
-                        "error", "sources", "details"])
-            for r in records:
-                w.writerow([
-                    r.key, r.provider, r.status, r.remaining, r.score,
-                    r.balance_summary, r.info,
-                    len(r.models),
-                    "; ".join(r.working_models),
-                    r.error,
-                    "; ".join(sorted(r.sources)),
-                    json.dumps(r.details, ensure_ascii=False),
-                ])
-        self._set_status(f"Exported → {txt_path}")
-        working_txt = self._write_working_file("export")
-        log.info("Exported best=%d → %s | %s | %s", len(best), txt_path, json_path, csv_path)
-        extra = f"\n• {working_txt}" if working_txt else ""
-        QMessageBox.information(
-            self, "Exported",
-            f"Wrote:\n• {txt_path}\n• {json_path}\n• {csv_path}{extra}"
-        )
