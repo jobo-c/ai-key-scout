@@ -856,7 +856,25 @@ Opaque vendors often have no stable prefix. We only accept these when the
 surrounding configuration explicitly names the provider, avoiding arbitrary
 20+ character strings being treated as credentials.
 """
-_LABELED_PROVIDER_PATTERNS = {\n    "cohere": re.compile(r"(?i)COHERE(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "deepinfra": re.compile(r"(?i)DEEPINFRA(?:_API)?_(?:KEY|TOKEN)\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "sambanova": re.compile(r"(?i)SAMBANOVA(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "nebius": re.compile(r"(?i)NEBIUS(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "hyperbolic": re.compile(r"(?i)HYPERBOLIC(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "ai21": re.compile(r"(?i)AI21(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "minimax": re.compile(r"(?i)MINIMAX(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "mistral": re.compile(r"(?i)MISTRAL(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "together": re.compile(r"(?i)TOGETHER(?:AI)?(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "siliconflow": re.compile(r"(?i)SILICONFLOW(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "moonshot": re.compile(r"(?i)(?:MOONSHOT|KIMI)(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "fireworks": re.compile(r"(?i)FIREWORKS(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "groq": re.compile(r"(?i)GROQ(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "cerebras": re.compile(r"(?i)CEREBRAS(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "perplexity": re.compile(r"(?i)PERPLEXITY(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n    "openrouter": re.compile(r"(?i)OPENROUTER(?:_API)?_KEY\\s*[:=]\\s*([A-Za-z0-9._~+/=-]{16,512})"),\n}\n_LABELED_HINTS = tuple(x.pattern.split("\\s")[0].replace("(?i)", "") for x in _LABELED_PROVIDER_PATTERNS.values())
+_LABELED_PROVIDER_PATTERNS = {
+    "cohere": re.compile(r"(?i)COHERE(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "deepinfra": re.compile(r"(?i)DEEPINFRA(?:_API)?_(?:KEY|TOKEN)\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "sambanova": re.compile(r"(?i)SAMBANOVA(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "nebius": re.compile(r"(?i)NEBIUS(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "hyperbolic": re.compile(r"(?i)HYPERBOLIC(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "ai21": re.compile(r"(?i)AI21(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "minimax": re.compile(r"(?i)MINIMAX(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "mistral": re.compile(r"(?i)MISTRAL(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "together": re.compile(r"(?i)TOGETHER(?:AI)?(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "siliconflow": re.compile(r"(?i)SILICONFLOW(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "moonshot": re.compile(r"(?i)(?:MOONSHOT|KIMI)(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "fireworks": re.compile(r"(?i)FIREWORKS(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "groq": re.compile(r"(?i)GROQ(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "cerebras": re.compile(r"(?i)CEREBRAS(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "perplexity": re.compile(r"(?i)PERPLEXITY(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "openrouter": re.compile(r"(?i)OPENROUTER(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+}
+_LABELED_HINTS = tuple(x.pattern.split("\\s")[0].replace("(?i)", "") for x in _LABELED_PROVIDER_PATTERNS.values())
 
 # Only capture candidates that already look like real key prefixes (avoid matching every quoted string in ULP dumps)
 _ASSIGN_PATTERNS = [
