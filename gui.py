@@ -21,16 +21,16 @@ from PyQt6.QtWidgets import (
     QMenu, QInputDialog,
 )
 
-from . import __version__
-from .models_store import KeyStore
-from .providers import (
+import __init__ as package_info
+from models_store import KeyStore
+from providers import (
     PROVIDERS, detect_keys_in_text, provider_name, all_provider_ids,
     count_by_provider, detectable_provider_ids,
 )
-from .ranking import format_best_report, is_best_candidate, score_record, sort_best
-from .workers import ScanWorker, CheckWorker, ModelTestWorker
-from . import history as key_history
-from . import report as key_report
+from ranking import format_best_report, is_best_candidate, score_record, sort_best
+from workers import ScanWorker, CheckWorker, ModelTestWorker
+import history as key_history
+import report as key_report
 
 
 DEFAULT_EXTS = ".txt"  # fastest default — only plaintext dumps
@@ -479,7 +479,7 @@ class MainWindow(QMainWindow):
     def export_best(self):
         """Export verified working keys for direct Hermes/OpenCode use."""
         try:
-            from .export_config import write_hermes, write_opencode, write_bundle
+            from export_config import write_hermes, write_opencode, write_bundle
         except Exception as e:
             QMessageBox.warning(self, "Export", f"Exporter unavailable:\\n{e}")
             return
