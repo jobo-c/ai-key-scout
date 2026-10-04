@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QFileDialog, QProgressBar, QCheckBox, QComboBox, QDoubleSpinBox, QSpinBox,
     QMessageBox, QGroupBox, QSplitter, QDialog, QDialogButtonBox, QFormLayout,
     QStatusBar, QAbstractItemView, QTableWidget, QTableWidgetItem, QHeaderView,
-    QMenu,
+    QMenu, QInputDialog,
 )
 
 from . import __version__
@@ -475,6 +475,76 @@ class MainWindow(QMainWindow):
             self.maxmb_spin.setValue(int(self.settings.get("max_mb", 0)))
             self.maxmb_spin.blockSignals(False)
             self._set_status("Settings saved")
+
+    def export_best(self):
+        """Export verified working keys for direct Hermes/OpenCode use."""
+        try:
+            from .export_config import write_hermes, write_opencode, write_bundle
+        except Exception as e:
+            QMessageBox.warning(self, "Export", f"Exporter unavailable:\\n{e}")
+            return
+
+        eligible = [r for r in self.store.all()
+                    if r.status == "valid" and (r.working_models or
+                       (r.details or {}).get("free_working") or
+                       (r.details or {}).get("paid_working"))]
+        if not eligible:
+            QMessageBox.information(
+                self, "Export best",
+                "No verified working keys yet.\\n\\n"
+                "Run Check keys, then Test models (say hi) first."
+            )
+            return
+
+        box = QMessageBox(self)
+        box.setWindowTitle("Export verified keys")
+        box.setText(
+            "Export only keys that are VALID and have actually answered a model test.\\n\\n"
+            "Secrets are stored in .env (0600 on Linux); config files use environment references."
+        )
+        hermes_btn = box.addButton("Hermes config.yaml", QMessageBox.ButtonRole.AcceptRole)
+        open_btn = box.addButton("OpenCode opencode.json", QMessageBox.ButtonRole.AcceptRole)
+        both_btn = box.addButton("Both", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is None or clicked.text() == "Cancel":
+            return
+
+        limit, ok = QInputDialog.getInt(
+            self, "How many verified keys?",
+            "Export the top N verified keys (Hermes uses the #1 as its active model):",
+            min(5, len(eligible)), 1, min(50, len(eligible)), 1
+        )
+        if not ok:
+            return
+        directory = QFileDialog.getExistingDirectory(
+            self, "Select export directory", os.path.expanduser("~")
+        )
+        if not directory:
+            return
+
+        try:
+            if clicked is hermes_btn:
+                result = write_hermes(eligible, directory, limit)
+                msg = f"Hermes exported.\\n\\nconfig: {result[0]}\\n.env: {result[1]}\\nkeys: {result[2]}"
+            elif clicked is open_btn:
+                result = write_opencode(eligible, directory, limit)
+                msg = f"OpenCode exported.\\nopencode.json: {result[0]}\\n.env: {result[1]}\\nkeys: {result[2]}"
+            else:
+                result = write_bundle(eligible, directory, limit)
+                msg = (
+                    "Both formats exported.\\n\\n"
+                    f"Hermes: {result['hermes'][0]}\\n"
+                    f"OpenCode: {result['opencode'][0]}\\n"
+                    f"Verified keys: {result['count']}\\n\\n"
+                    "Keep the generated .env files private."
+                )
+            QMessageBox.information(self, "Export complete", msg)
+            self._set_status(f"Exported {limit} verified key(s) for {'both' if clicked is both_btn else clicked.text()}")
+        except Exception as e:
+            log.exception("Export failed")
+            QMessageBox.warning(self, "Export failed", str(e))
 
     def browse_dir(self):
         d = QFileDialog.getExistingDirectory(self, "Select folder to scan", self.dir_edit.text() or os.path.expanduser("~"))
