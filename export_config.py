@@ -349,6 +349,8 @@ def write_bundle(records: Iterable[Any], directory: str, limit: int = 1) -> Dict
     except OSError:
         pass
 
+    extras = write_extra_configs(selected, directory, limit=len(selected))
+
     return {
         "directory": directory,
         "hermes": (hermes_path, env_path, count),
