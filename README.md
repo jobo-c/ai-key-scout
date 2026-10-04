@@ -1,6 +1,6 @@
 # AI Key Scout
 
-AI Key Scout v5 is a fast, local-first AI provider capability benchmark for authorized credential auditing. It discovers provider credentials, verifies authentication, tests usable models, ranks results, and builds one portable export folder for Hermes and OpenCode.
+AI Key Scout v5.1 is a fast, local-first AI provider capability benchmark for authorized credential auditing. It discovers provider credentials, verifies authentication, tests usable models, ranks results, and builds one portable export folder for Hermes and OpenCode.
 
 > **Authorization and safety:** Only scan and validate credentials you own or are explicitly authorized to audit. API validation can contact provider services and model tests can consume quota. Paid-model testing is opt-in.
 
@@ -10,6 +10,8 @@ AI Key Scout v5 is a fast, local-first AI provider capability benchmark for auth
 - Recognizes a broad set of AI providers and common environment-variable naming patterns.
 - Deduplicates discovered credentials and identifies providers.
 - Validates credentials with provider-specific API calls where supported.
+- Loads persistent validation history at startup and skips credentials that were already validated; explicit recheck actions remain available.
+- Shows provider/model information directly in the main results table, with an explicit full-key reveal toggle for authorized local auditing.
 - Retrieves available model information when the provider exposes it.
 - Separates verified free-model results from paid-model results when model metadata allows it.
 - Tests real model responses instead of treating an HTTP authentication response as proof that inference works.
@@ -22,7 +24,7 @@ AI Key Scout v5 is a fast, local-first AI provider capability benchmark for auth
 
 The provider registry includes, among others:
 
-OpenRouter, OpenAI, Anthropic, Google/Gemini, Groq, DeepSeek, xAI, Mistral, Together, Fireworks, Cerebras, Perplexity, Cohere, Hugging Face, Replicate, SiliconFlow, Moonshot/Kimi, Novita, DeepInfra, Zhipu/z.ai, DashScope/Alibaba, NVIDIA, SambaNova, Jina, Voyage, Tavily, LangSmith, MiniMax, Nebius, Hyperbolic and AI21.
+OpenRouter, OpenAI, Anthropic, Google/Gemini, Groq, DeepSeek, xAI, Mistral, Together, Fireworks, Cerebras, Perplexity, Cohere, Hugging Face, Replicate, SiliconFlow, Moonshot/Kimi, Novita, DeepInfra, Zhipu/z.ai, DashScope/Alibaba, NVIDIA, SambaNova, Jina, Voyage, Tavily, LangSmith, MiniMax, Nebius, Hyperbolic, AI21, and Nous Research / Nous Portal.
 
 Provider coverage is intentionally extensible. Detection and validation are separate: a credential may be detected for a provider even when that provider's live validation endpoint is unavailable.
 
@@ -50,6 +52,7 @@ The GUI can export the best verified credentials as:
 - **Hermes**: `config.yaml` plus a protected `.env`
 - **OpenCode**: `opencode.json` plus a protected `.env`
 - **Both**: one directory containing `config.yaml`, `opencode.json`, and one shared protected `.env`
+- **Full bundle**: also writes `providers.json`, `opencode.jsonc`, and `litellm.yaml` with environment-backed credentials
 
 Secrets are referenced through environment variables rather than embedded directly into generated configuration files.
 
