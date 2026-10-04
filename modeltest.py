@@ -148,6 +148,19 @@ def served_any_choice(body: Any) -> bool:
     return False
 
 
+def model_tier(model: str, provider: str = "") -> str:
+    """Best-effort free/paid classification.
+
+    Exact pricing metadata is preferred when available by the caller. As a
+    provider-independent fallback, OpenRouter's explicit ':free' model suffix is
+    authoritative. Unknown is never silently treated as free.
+    """
+    m = str(model or "").lower()
+    if provider == "openrouter" and (m.endswith(":free") or m == "openrouter/free"):
+        return "free"
+    return "unknown"
+
+
 def filter_catalog(catalog: Optional[List[str]]) -> List[str]:
     """Catalog ids that could plausibly answer a chat message (order preserved)."""
     out: List[str] = []
@@ -194,8 +207,10 @@ async def chat_once(
     """Send 'hi' to one model and describe what happened."""
     req = build_request(cfg, key, model)
     style = (cfg.get("chat") or {}).get("style", "openai")
+    provider = str(cfg.get("_provider_id") or "")
+    tier = model_tier(model, provider)
     if req is None:
-        return {"model": model, "ok": False, "error": "provider does not expose a chat endpoint"}
+        return {"model": model, "tier": tier, "ok": False, "error": "provider does not expose a chat endpoint"}
     url, payload = req
     headers = dict((cfg.get("chat") or {}).get("headers_fn", cfg["headers"])(key))
     if style in ("openai", "cohere", "embed", "google") and "Content-Type" not in headers:
@@ -213,25 +228,25 @@ async def chat_once(
             except Exception:
                 body = await resp.text()
     except Exception as e:
-        return {"model": model, "ok": False, "status": None,
+        return {"model": model, "tier": tier, "ok": False, "status": None,
                 "error": f"network error: {str(e)[:100]}",
                 "latency_ms": int((time.time() - started) * 1000)}
 
     latency = int((time.time() - started) * 1000)
     reply = extract_reply(body, style) if status == 200 else ""
     if status == 200 and reply:
-        return {"model": model, "ok": True, "status": status, "text": True,
+        return {"model": model, "tier": tier, "ok": True, "status": status, "text": True,
                 "reply": reply[:120], "latency_ms": latency, "error": ""}
     if status == 200 and served_any_choice(body):
         # The provider ran inference for this key but produced no visible text
         # (reasoning model, or the token budget was spent on the trace).
-        return {"model": model, "ok": True, "status": status, "text": False,
+        return {"model": model, "tier": tier, "ok": True, "status": status, "text": False,
                 "reply": "", "latency_ms": latency,
                 "error": "ran, but returned no visible text"}
     if status == 200:
         # A 200 that is NOT a completion envelope is not proof of anything.
         snippet = json.dumps(body)[:160] if isinstance(body, (dict, list)) else str(body)[:160]
-        return {"model": model, "ok": False, "status": status, "text": False,
+        return {"model": model, "tier": tier, "ok": False, "status": status, "text": False,
                 "error": f"no completion returned ({snippet})", "latency_ms": latency}
     err = ""
     if isinstance(body, dict):
@@ -241,7 +256,7 @@ async def chat_once(
         err = err or str(body.get("detail") or body.get("message") or "")
     elif isinstance(body, str):
         err = body
-    return {"model": model, "ok": False, "status": status,
+    return {"model": model, "tier": tier, "ok": False, "status": status,
             "error": f"HTTP {status} {err[:120]}".strip(), "latency_ms": latency}
 
 
@@ -291,9 +306,11 @@ async def test_models(
     limit: int = 3,
     timeout: float = 12,
     proxy: Optional[str] = None,
+    test_paid: bool = False,
 ) -> Dict[str, Any]:
-    """Test models sequentially, stopping as soon as one answers."""
-    return await _test(session, key, provider, catalog, limit, timeout, proxy, concurrent=False)
+    """Test models; paid inference is opt-in."""
+    return await _test(session, key, provider, catalog, limit, timeout, proxy,
+                       concurrent=False, test_paid=test_paid)
 
 
 async def test_models_concurrent(
@@ -304,18 +321,25 @@ async def test_models_concurrent(
     limit: int = 3,
     timeout: float = 12,
     proxy: Optional[str] = None,
+    test_paid: bool = False,
 ) -> Dict[str, Any]:
-    """Test models in parallel (what the worker uses)."""
-    return await _test(session, key, provider, catalog, limit, timeout, proxy, concurrent=True)
+    """Test models in parallel; paid inference is opt-in."""
+    return await _test(session, key, provider, catalog, limit, timeout, proxy,
+                       concurrent=True, test_paid=test_paid)
 
 
-async def _test(session, key, provider, catalog, limit, timeout, proxy, concurrent: bool) -> Dict[str, Any]:
+async def _test(session, key, provider, catalog, limit, timeout, proxy,
+              concurrent: bool, test_paid: bool = False) -> Dict[str, Any]:
     cfg = PROVIDERS.get(provider)
     if not cfg:
         return {"tested": [], "working": [], "note": "unknown provider"}
-    chat = cfg.get("chat") or {}
+    chat = dict(cfg.get("chat") or {})
     if chat.get("unsupported"):
         return {"tested": [], "working": [], "note": chat["unsupported"]}
+    # Carry provider id into chat_once without changing the public registry schema.
+    cfg = dict(cfg)
+    cfg["chat"] = dict(chat)
+    cfg["chat"]["_provider_id"] = provider
 
     stages = _stage_candidates(cfg, catalog, limit)
     if not stages:
@@ -323,16 +347,44 @@ async def _test(session, key, provider, catalog, limit, timeout, proxy, concurre
 
     tested: List[Dict[str, Any]] = []
     working: List[str] = []
+    free_working: List[str] = []
+    paid_working: List[str] = []
+
     for models in stages:
+        if not test_paid:
+            models = [m for m in models if model_tier(m, provider) != "paid"]
+        if not models:
+            continue
         try:
             results = await _run_stage(session, cfg, key, models, timeout, proxy, concurrent)
         except Exception as e:
-            results = [{"model": m, "ok": False, "error": f"exception: {str(e)[:80]}"} for m in models]
+            results = [{"model": m, "tier": model_tier(m, provider), "ok": False,
+                        "error": f"exception: {str(e)[:80]}"} for m in models]
         tested.extend(results)
-        working.extend([r["model"] for r in results if r.get("ok")])
-        if working:
-            break  # no need to spend the fallback stage
-    return {"tested": tested, "working": working, "note": ""}
+        for r in results:
+            if not r.get("ok"):
+                continue
+            m = r["model"]
+            working.append(m)
+            tier = r.get("tier") or model_tier(m, provider)
+            if tier == "free":
+                free_working.append(m)
+            elif tier == "paid":
+                paid_working.append(m)
+        # Keep probing until we have both tiers when paid testing is explicitly enabled.
+        if working and (not test_paid or (free_working and paid_working)):
+            break
+
+    # If a provider does not expose pricing, report that tier as unknown rather
+    # than pretending a successful call was free.
+    return {
+        "tested": tested,
+        "working": working,
+        "free_working": free_working,
+        "paid_working": paid_working,
+        "note": "",
+        "paid_testing": bool(test_paid),
+    }
 
 
 def summarise(result: Dict[str, Any]) -> str:
