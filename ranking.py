@@ -11,60 +11,71 @@ from security import fingerprint, mask_secret
 
 
 def score_record(rec: KeyRecord) -> float:
-    """Higher = better API to keep. Used for Best list ranking."""
-    if rec.status != "valid":
-        # rate_limited / unknown are inconclusive, not good — but they are also
-        # not as bad as a revoked key, and they are retried rather than dropped.
-        return -100.0 if rec.status == "invalid" else -60.0
-    score = 20.0
-    rem = rec.remaining
-    details = rec.details or {}
+    """Bounded 0-100 capability score with a persisted component breakdown."""
+    d = rec.details or {}
+    if rec.status == "invalid":
+        d["score_breakdown"] = {"authentication": 0}
+        rec.details = d
+        return 0.0
+    if rec.status in ("pending", "error"):
+        return 0.0
+    if rec.status in ("unknown", "rate_limited"):
+        return 15.0
 
-    if details.get("state") == "valid_no_funds":
-        # Authenticated but out of credit: proves the key is real, worth keeping
-        # for the account it reveals, but not usable right now.
-        score -= 45
-    if details.get("discovered_as"):
-        score += 4  # opaque key that we positively identified is more useful
-    if details.get("org_usage_visible"):
-        score += 12  # admin/console-level access
-    if details.get("auth_note"):
-        score -= 2
-    # Having answered a real "hi" is the strongest proof a key works — worth more
-    # than a balance figure, because it cannot be a stale or public endpoint.
-    if rec.working_models:
-        score += 25 + min(len(rec.working_models), 5) * 3
-    if (details.get("model_tests") and not rec.working_models
-            and details.get("model_test_note")):
-        score -= 5  # tested and nothing answered
+    points = {}
+    # Authentication is the foundation.
+    points["authentication"] = 25.0
+    if d.get("state") == "valid_no_funds":
+        points["authentication"] = 20.0
 
-    if rem is not None:
-        rem_f = float(rem)
-        if rem_f < 0:
-            score -= 80  # drained / negative — not useful
-        elif rem_f == 0:
-            score -= 40
+    kind = d.get("provider_kind") or ("tool" if d.get("capabilities") and not rec.models else "llm")
+    if kind == "tool":
+        caps = len(d.get("capabilities") or [])
+        points["capabilities"] = min(20.0, 5.0 + caps * 2.5)
+        points["service_response"] = 20.0 if d.get("http_status") in (200, 201, 202) else 10.0
+        points["account_info"] = 10.0 if any(k in d for k in ("plan", "tier", "organization", "account", "email", "username")) else 4.0
+        rl = d.get("rate_limit") or {}
+        points["rate_limits"] = 10.0 if rl.get("remaining") is not None else 5.0
+        latency = d.get("latency_ms")
+        points["latency"] = 10.0 if latency is None else (10.0 if float(latency) <= 500 else 7.0 if float(latency) <= 1500 else 4.0)
+    else:
+        working = len(rec.working_models or [])
+        model_count = len(rec.models or [])
+        points["working_models"] = min(25.0, working * 5.0)
+        points["model_catalog"] = min(15.0, model_count * 0.75)
+        if working:
+            points["inference_proof"] = 20.0
+        elif d.get("model_tests"):
+            points["inference_proof"] = 5.0
         else:
-            score += min(rem_f, 500.0)  # $1 ≈ 1 point, capped
-            if rem_f >= 1:
-                score += 15
-            if rem_f >= 10:
-                score += 20
-    elif details.get("has_balance") is False and rec.models:
-        score += 8  # valid with models but no $ API
+            points["inference_proof"] = 0.0
+        rem = rec.remaining
+        if rem is not None:
+            try:
+                points["usable_credit"] = 10.0 if float(rem) > 0 else 0.0
+            except Exception:
+                points["usable_credit"] = 2.0
+        else:
+            points["usable_credit"] = 4.0
+        rl = d.get("rate_limit") or {}
+        points["rate_limits"] = 5.0 if rl.get("remaining") is not None else 2.0
+        points["latency"] = 5.0 if d.get("latency_ms") is None or float(d.get("latency_ms", 9999)) <= 1000 else 2.0
 
-    if details.get("is_free_tier") is True:
-        score -= 25
-    if details.get("is_free_tier") is False and (rem is None or float(rem) > 0):
-        score += 15
-    if details.get("limit") is None and details.get("is_free_tier") is False and (rem is None or float(rem) > 0):
-        score += 10  # uncapped paid with credit left / unknown
-    if details.get("is_management_key"):
-        score += 12
-    if rec.models:
-        score += min(len(rec.models), 20) * 0.5
-    return score
+    if d.get("is_free_tier") is True:
+        # Free is useful, but not automatically better than a funded account.
+        points["tier"] = 2.0
+    elif d.get("is_free_tier") is False:
+        points["tier"] = 5.0
+    else:
+        points["tier"] = 3.0
 
+    total = min(100.0, max(0.0, sum(points.values())))
+    d["score_breakdown"] = {k: round(v, 2) for k, v in points.items()}
+    d["score_total"] = round(total, 2)
+    d["score_version"] = "5.2"
+    d["provider_kind"] = kind
+    rec.details = d
+    return round(total, 2)
 
 def is_best_candidate(rec: KeyRecord, min_remaining: float = 0.01, require_valid: bool = True) -> bool:
     if require_valid and rec.status != "valid":
