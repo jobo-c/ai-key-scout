@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"AI Key Scout Query","type":"object","required":["provider","url","method"],"properties":{"provider":{"type":"string"},"url":{"type":"string"},"method":{"enum":["GET","POST","HEAD"]},"timeout":{"type":"number","minimum":1},"cache_seconds":{"type":"number","minimum":0},"models_limit":{"type":"integer","minimum":0}}}
