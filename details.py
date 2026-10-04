@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import aiohttp
 
-from .providers import PROVIDERS
+from providers import PROVIDERS
 
 
 def _parse_retry_after(headers) -> Optional[float]:
@@ -506,7 +506,7 @@ async def discover_provider(
     never checked. This pass tries each in priority order and keeps the first
     provider that authenticates.
     """
-    from .providers import discovery_order  # local import avoids a cycle
+    from providers import discovery_order  # local import avoids a cycle
 
     for pid in discovery_order():
         res = await check_provider(
