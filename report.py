@@ -27,7 +27,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from typing import Any, Dict, List, Optional, Tuple\n\nfrom .security import fingerprint, mask_secret\n
+from typing import Any, Dict, List, Optional, Tuple\n\nfrom security import fingerprint, mask_secret\n
 
 WORKING_TXT = "working_keys.txt"
 WORKING_JSON = "working_keys.json"
@@ -165,7 +165,7 @@ def _find_by_fingerprint(records, fp: str):
 def provider_label(pid: str) -> str:
     """Human name for a provider id, without importing the registry graph."""
     try:
-        from .providers import provider_name
+        from providers import provider_name
         return provider_name(pid)
     except Exception:
         return pid
