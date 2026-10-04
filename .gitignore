@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local secrets and generated credential data
+.env
+.env.*
+!.env.example
+working_keys.json
+working_keys.txt
+all_results.csv
+valid_results.csv
+invalid_results.csv
+discovered.json
+valid.json
+invalid.json
+summary.json
+results/
+reports/
+exports/
+*.log
+
+# Local model/provider state
+models.json
+model_cache/
