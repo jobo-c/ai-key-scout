@@ -113,12 +113,12 @@ STATE_INVALID = "invalid"
 
 
 _MODEL_ERR_RE = re.compile(
-    r"model\b[^.\n]{0,80}?"
+    r"model\\b[^.\\n]{0,80}?"
     r"(not found|does not exist|not exist|unknown|unsupported|invalid|end of life|"
     r"end-of-life|deprecated|no longer|retired|decommission|gone)"
     r"|"
     r"(not found|does not exist|unsupported|unknown|deprecated|retired|end of life)"
-    r"[^.\n]{0,40}?\bmodel\b",
+    r"[^.\\n]{0,40}?\\bmodel\\b",
     re.IGNORECASE,
 )
 
