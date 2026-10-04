@@ -382,8 +382,11 @@ async def _test(session, key, provider, catalog, limit, timeout, proxy,
                 free_working.append(m)
             elif tier == "paid":
                 paid_working.append(m)
-        # Keep probing until we have both tiers when paid testing is explicitly enabled.
-        if working and (not test_paid or (free_working and paid_working)):
+        # Do not stop after the first success: the purpose of this phase is
+        # to report which sampled models actually serve this key. The per-key limit
+        # bounds cost/latency. When paid testing is enabled we stop once both tiers
+        # have a proven result.
+        if test_paid and free_working and paid_working:
             break
 
     # If a provider does not expose pricing, report that tier as unknown rather
@@ -395,6 +398,9 @@ async def _test(session, key, provider, catalog, limit, timeout, proxy,
         "paid_working": paid_working,
         "note": "",
         "paid_testing": bool(test_paid),
+        "tested_count": len(tested),
+        "free_tested": sum(1 for r in tested if r.get("tier") == "free"),
+        "paid_tested": sum(1 for r in tested if r.get("tier") == "paid"),
     }
 
 
