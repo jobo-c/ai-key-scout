@@ -1342,6 +1342,53 @@ class MainWindow(QMainWindow):
             log.exception("Failed to load history")
             QMessageBox.warning(self, "Load history", f"Could not load history:\n{e}")
 
+    def save_history(self):
+        """Merge the current in-memory records into persistent history.json."""
+        try:
+            data = key_history.load_history()
+            added = key_history.merge_records(data, self.store.all())
+            path = key_history.save_history(data)
+            total = len(data.get("keys", {}))
+            self._set_status(f"History saved · {added} new keys · {total} stored → {os.path.basename(path)}")
+            log.info("History saved path=%s new_keys=%d total=%d", path, added, total)
+        except Exception as e:
+            log.exception("Failed to save history")
+            QMessageBox.warning(self, "Save history", f"Could not save history:\n{e}")
+
+    def load_history(self):
+        """Load persistent history.json into the current key store."""
+        try:
+            data = key_history.load_history()
+            rows = data.get("keys") or {}
+            if not isinstance(rows, dict):
+                rows = {}
+            loaded = 0
+            for key, row in rows.items():
+                if not isinstance(row, dict) or not key:
+                    continue
+                rec = self.store.add(str(key), str(row.get("provider") or "unknown"), source="history")
+                sources = row.get("sources") or []
+                if isinstance(sources, (list, tuple, set)):
+                    rec.sources.update(str(s) for s in sources if s)
+                for attr in ("status", "remaining", "balance_summary", "score", "info"):
+                    value = row.get(attr)
+                    if value is not None and value != "":
+                        setattr(rec, attr, value)
+                if isinstance(row.get("models"), list):
+                    rec.models = list(dict.fromkeys(str(x) for x in row["models"] if x))
+                if isinstance(row.get("working_models"), list):
+                    rec.working_models = list(dict.fromkeys(str(x) for x in row["working_models"] if x))
+                if isinstance(row.get("details"), dict):
+                    rec.details = dict(row["details"])
+                loaded += 1
+            self._request_ui_refresh()
+            self._ui_dirty = True
+            self._set_status(f"History loaded · {loaded} keys · {len(rows)} stored records")
+            log.info("History loaded path=%s records=%d", key_history.history_path(), loaded)
+        except Exception as e:
+            log.exception("Failed to load history")
+            QMessageBox.warning(self, "Load history", f"Could not load history:\n{e}")
+
     def copy_selected_key(self):
         if not self._selected_key:
             return
