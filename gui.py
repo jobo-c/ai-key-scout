@@ -37,7 +37,7 @@ DEFAULT_EXTS = ".txt"  # fastest default — only plaintext dumps
 ALL_LIST_CAP = 800          # never render thousands of table rows
 CHECK_WARN_AT = 300         # confirm before huge checks
 CHECK_HARD_CAP = 10000      # refuse beyond this in one run (prevents crash)
-TABLE_COLS = ["Status", "Provider", "Remaining", "Score", "Works", "Summary", "Key", "Context"]
+TABLE_COLS = ["Status", "Provider", "Remaining", "Score", "Works", "Models", "Summary", "Key", "Context"]
 SORT_ROLE = int(Qt.ItemDataRole.UserRole) + 1
 
 
@@ -111,7 +111,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"AI Key Scout v{package_info.__version__}")
-        self.resize(1180, 760)
+        self.resize(1380, 820)
 
         self.store = KeyStore()
         # max_mb 0 = no size skip (v2 read-whole-file + regex)
@@ -140,7 +140,8 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._apply_style()
-        self._set_status("Ready — paste keys or scan a folder of .txt dumps")
+        self.load_history()
+        self._set_status(f"Ready · {len(self.store)} historical keys loaded")
         log.info("MainWindow ready")
 
     # ---------- UI ----------
@@ -170,12 +171,16 @@ class MainWindow(QMainWindow):
         self.load_hist_btn = QPushButton("Load history")
         self.load_hist_btn.setToolTip("Load keys from history.json into the table")
         self.load_hist_btn.clicked.connect(self.load_history)
+        self.reveal_keys = QCheckBox("Show full keys")
+        self.reveal_keys.setToolTip("Reveal raw credentials in the table only while this box is checked.")
+        self.reveal_keys.stateChanged.connect(lambda _=0: self.refresh_lists())
         self.clear_btn = QPushButton("Clear")
         self.clear_btn.clicked.connect(self.clear_all)
         header.addWidget(self.settings_btn)
         header.addWidget(self.export_btn)
         header.addWidget(self.save_hist_btn)
         header.addWidget(self.load_hist_btn)
+        header.addWidget(self.reveal_keys)
         header.addWidget(self.clear_btn)
         outer.addLayout(header)
 
@@ -346,7 +351,7 @@ class MainWindow(QMainWindow):
         hdr.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         hdr.customContextMenuRequested.connect(self._header_menu)
         # Sensible default widths (user can drag to change)
-        for i, w in enumerate([72, 120, 100, 64, 150, 300, 150, 280]):
+        for i, w in enumerate([72, 120, 100, 64, 150, 190, 280, 150, 280]):
             self.keys_table.setColumnWidth(i, w)
         self.keys_table.itemSelectionChanged.connect(self.on_table_selected)
         al.addWidget(self.keys_table)
@@ -479,7 +484,7 @@ class MainWindow(QMainWindow):
     def export_best(self):
         """Export verified working keys for direct Hermes/OpenCode use."""
         try:
-            from export_config import write_hermes, write_opencode, write_bundle
+            from export_config import write_hermes, write_opencode, write_bundle, write_extra_configs
         except Exception as e:
             QMessageBox.warning(self, "Export", f"Exporter unavailable:\\n{e}")
             return
@@ -505,6 +510,7 @@ class MainWindow(QMainWindow):
         hermes_btn = box.addButton("Hermes config.yaml", QMessageBox.ButtonRole.AcceptRole)
         open_btn = box.addButton("OpenCode opencode.json", QMessageBox.ButtonRole.AcceptRole)
         both_btn = box.addButton("Both", QMessageBox.ButtonRole.AcceptRole)
+        full_btn = box.addButton("Full bundle", QMessageBox.ButtonRole.AcceptRole)
         box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
         box.exec()
         clicked = box.clickedButton()
@@ -541,7 +547,7 @@ class MainWindow(QMainWindow):
                     "Keep the generated .env files private."
                 )
             QMessageBox.information(self, "Export complete", msg)
-            self._set_status(f"Exported {limit} verified key(s) for {'both' if clicked is both_btn else clicked.text()}")
+            self._set_status(f"Exported {limit} verified key(s) · {clicked.text()}")
         except Exception as e:
             log.exception("Export failed")
             QMessageBox.warning(self, "Export failed", str(e))
@@ -856,6 +862,8 @@ class MainWindow(QMainWindow):
                 continue
             if pid and r.provider != pid:
                 continue
+            if not only_key and (r.working_models or (r.details or {}).get("model_tests")):
+                continue
             chat = (PROVIDERS.get(r.provider) or {}).get("chat") or {}
             if not chat or chat.get("unsupported"):
                 continue  # nothing to say hi to
@@ -1133,14 +1141,17 @@ class MainWindow(QMainWindow):
             else:
                 works_txt = "—"
                 works_sort = -3
+            model_txt = ", ".join((r.working_models or r.models or [])[:3])[:180]
+            key_txt = r.key if self.reveal_keys.isChecked() else r.mask(8)
             cells = [
                 (r.status or "pending", None),
                 (provider_name(r.provider), None),
                 (rem_txt, rem_sort),
                 (score_txt, score_sort),
                 (works_txt, works_sort),
-                ((r.balance_summary or r.error or "")[:140], None),
-                (r.mask(8), None),
+                (model_txt or "—", None),
+                ((r.balance_summary or r.error or r.info or "")[:140], None),
+                (key_txt, None),
                 (ctx, None),
             ]
             for col, (text, sort_val) in enumerate(cells):
