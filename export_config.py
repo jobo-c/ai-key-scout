@@ -373,6 +373,7 @@ def write_bundle(records: Iterable[Any], directory: str, limit: int = 1) -> Dict
     A single .env is shared by both generated configs so the export is portable
     as one folder. No raw credential is written to config.yaml/opencode.json.
     """
+    records = list(records)
     selected = select_best(records, limit)
     if not selected:
         raise ValueError("No valid key with a verified working model is available.")
