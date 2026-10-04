@@ -16,8 +16,8 @@ SECRET_KEYS = {
 }
 
 KEY_ASSIGNMENT_RE = re.compile(
-    r'(?i)(\\b(?:api[_-]?key|token|secret|password|authorization|credential)'
-    r'\\s*[:=]\\s*)([\\'"]?)([^\\s,;\\'"}]+)(\\2)'
+    r"""(?i)(\b(?:api[_-]?key|token|secret|password|authorization|credential)
+    \s*[:=]\s*)(['"]?)([^\s,;'"}]+)(\2)"""
 )
 
 def fingerprint(secret: str, length: int = 12) -> str:
@@ -35,7 +35,10 @@ def mask_secret(secret: str, visible: int = 4) -> str:
 def redact_text(value: Any) -> str:
     """Redact common credential assignments without exposing the secret."""
     text = str(value)
-    return KEY_ASSIGNMENT_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}[REDACTED]{m.group(4)}", text)
+    return KEY_ASSIGNMENT_RE.sub(
+        lambda m: f"{m.group(1)}{m.group(2)}[REDACTED]{m.group(4)}",
+        text,
+    )
 
 def safe_record(record: Any) -> dict[str, Any]:
     """Convert a key record to a JSON-safe, secret-free summary."""
