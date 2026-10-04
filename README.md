@@ -1,13 +1,13 @@
 # AI Key Scout
 
-AI Key Scout v5.1 is a fast, local-first AI provider capability benchmark for authorized credential auditing. It discovers provider credentials, verifies authentication, tests usable models, ranks results, and builds one portable export folder for Hermes and OpenCode.
+AI Key Scout v5.2 is a fast, local-first AI provider capability benchmark for authorized credential auditing. It discovers provider credentials, verifies authentication, tests usable models, ranks results, and builds one portable export folder for Hermes and OpenCode.
 
 > **Authorization and safety:** Only scan and validate credentials you own or are explicitly authorized to audit. API validation can contact provider services and model tests can consume quota. Paid-model testing is opt-in.
 
 ## What it does
 
 - Scans project directories and supported text/config files for AI credentials.
-- Recognizes a broad set of AI providers and common environment-variable naming patterns.
+- Recognizes a broad set of LLM providers plus 15 additional AI tool/agent APIs.
 - Deduplicates discovered credentials and identifies providers.
 - Validates credentials with provider-specific API calls where supported.
 - Loads persistent validation history at startup and skips credentials that were already validated; explicit recheck actions remain available.
@@ -16,15 +16,15 @@ AI Key Scout v5.1 is a fast, local-first AI provider capability benchmark for au
 - Separates verified free-model results from paid-model results when model metadata allows it.
 - Tests real model responses instead of treating an HTTP authentication response as proof that inference works.
 - Supports optional paid-model testing. Keep this disabled when you do not want to consume credits.
-- Ranks working credentials by useful verification results.
+- Uses a bounded 0–100 capability score with separate authentication, inference/service response, models/capabilities, credit, rate-limit and latency components.
 - Produces reports without exposing full credentials in normal output.
-- Exports the best verified credentials into environment-backed configuration for Hermes and OpenCode.
+- Exports the best verified credentials into environment-backed configuration for Hermes/OpenCode and produces an ai-tools.json capability manifest for non-LLM services.
 
 ## Provider coverage
 
 The provider registry includes, among others:
 
-OpenRouter, OpenAI, Anthropic, Google/Gemini, Groq, DeepSeek, xAI, Mistral, Together, Fireworks, Cerebras, Perplexity, Cohere, Hugging Face, Replicate, SiliconFlow, Moonshot/Kimi, Novita, DeepInfra, Zhipu/z.ai, DashScope/Alibaba, NVIDIA, SambaNova, Jina, Voyage, Tavily, LangSmith, MiniMax, Nebius, Hyperbolic, AI21, and Nous Research / Nous Portal.
+OpenRouter, OpenAI, Anthropic, Google/Gemini, Groq, DeepSeek, xAI, Mistral, Together, Fireworks, Cerebras, Perplexity, Cohere, Hugging Face, Replicate, SiliconFlow, Moonshot/Kimi, Novita, DeepInfra, Zhipu/z.ai, DashScope/Alibaba, NVIDIA, SambaNova, Jina, Voyage, Tavily, LangSmith, MiniMax, Nebius, Hyperbolic, AI21, Nous Research / Nous Portal, plus Firecrawl, Browser Use, Browserless, Apify, Serper, Exa, ScrapingBee, ScraperAPI, Bright Data, Deepgram, AssemblyAI, Pinecone, fal.ai, Unstructured, and Modal.
 
 Provider coverage is intentionally extensible. Detection and validation are separate: a credential may be detected for a provider even when that provider's live validation endpoint is unavailable.
 
@@ -173,3 +173,41 @@ A verified result can now distinguish:
 
 This makes the project useful as a provider capability benchmark for authorized
 Hermes/OpenCode configuration rather than only a key detector.
+
+
+## v5.2 AI tool / agent benchmark
+
+v5.2 treats non-LLM AI services as first-class providers instead of forcing them through the chat/model-test pipeline. Fifteen additional services have dedicated credential patterns, authentication requests, capability metadata and scoring:
+
+- Firecrawl
+- Browser Use
+- Browserless
+- Apify
+- Serper
+- Exa
+- ScrapingBee
+- ScraperAPI
+- Bright Data
+- Deepgram
+- AssemblyAI
+- Pinecone
+- fal.ai
+- Unstructured
+- Modal
+
+Provider responses now preserve a small normalized metadata set where available: HTTP status, request latency, common rate-limit headers, provider category and declared capabilities. Raw response bodies and credentials are not exported.
+
+The scanner does not brute-force opaque AI-tool credentials against every provider. Labeled environment variables and recognizable key prefixes are used for discovery, keeping large scans fast.
+
+## v5.2 scoring
+
+Scores are bounded to **0–100** and are provider-kind aware:
+
+- LLMs: authentication, real inference proof, working models, model catalog, usable credit, rate limits, latency and account tier.
+- AI tools: authentication, service response, declared capabilities, account metadata, rate limits and latency.
+
+The score breakdown is stored in the record as `details.score_breakdown` together with `details.score_version`.
+
+## Provider information freshness
+
+Provider definitions are separated from the generic HTTP/detail layer. Each provider declares its authentication headers and validation endpoint, while the shared detail layer captures current response metadata and rate-limit headers. Provider-specific endpoints should be reviewed against the vendor's current documentation when a vendor changes its API.
