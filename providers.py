@@ -850,6 +850,32 @@ def _looks_like_junk_key(key: str) -> bool:
     return False
 
 
+"""Provider-specific labelled-secret extraction for opaque API keys.
+
+Opaque vendors often have no stable prefix. We only accept these when the
+surrounding configuration explicitly names the provider, avoiding arbitrary
+20+ character strings being treated as credentials.
+"""
+_LABELED_PROVIDER_PATTERNS = {
+    "cohere": re.compile(r"(?i)COHERE(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "deepinfra": re.compile(r"(?i)DEEPINFRA(?:_API)?_(?:KEY|TOKEN)\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "sambanova": re.compile(r"(?i)SAMBANOVA(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "nebius": re.compile(r"(?i)NEBIUS(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "hyperbolic": re.compile(r"(?i)HYPERBOLIC(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "ai21": re.compile(r"(?i)AI21(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "minimax": re.compile(r"(?i)MINIMAX(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "mistral": re.compile(r"(?i)MISTRAL(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "together": re.compile(r"(?i)TOGETHER(?:AI)?(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "siliconflow": re.compile(r"(?i)SILICONFLOW(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "moonshot": re.compile(r"(?i)(?:MOONSHOT|KIMI)(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "fireworks": re.compile(r"(?i)FIREWORKS(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "groq": re.compile(r"(?i)GROQ(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "cerebras": re.compile(r"(?i)CEREBRAS(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "perplexity": re.compile(r"(?i)PERPLEXITY(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+    "openrouter": re.compile(r"(?i)OPENROUTER(?:_API)?_KEY\s*[:=]\s*([A-Za-z0-9._~+/=-]{16,512})"),
+}
+_LABELED_HINTS = tuple(x.pattern.split("\\s")[0].replace("(?i)", "") for x in _LABELED_PROVIDER_PATTERNS.values())
+
 # Only capture candidates that already look like real key prefixes (avoid matching every quoted string in ULP dumps)
 _ASSIGN_PATTERNS = [
     re.compile(
@@ -962,7 +988,13 @@ def detect_keys_in_line(line: str) -> List[tuple]:
     for pid, pat in _STRONG_PATS:
         for m in pat.finditer(line):
             _register_hit(found, seen, m.group(0), pid, line[:400])
-    # Assignment forms only if line looks labeled
+    # Opaque keys: only accept them when the variable name explicitly identifies
+    # the provider. This adds coverage without scanning arbitrary long strings.
+    for pid, pat in _LABELED_PROVIDER_PATTERNS.items():
+        for m in pat.finditer(line):
+            _register_hit(found, seen, m.group(1), pid, line[:400])
+
+    # Assignment forms for strongly identifiable prefixes.
     if any(x in line.lower() for x in ("api", "key", "token", "bearer", "password", "openrouter", "openai")):
         for ap in _ASSIGN_PATTERNS:
             for m in ap.finditer(line):
@@ -1008,7 +1040,9 @@ def detect_keys_in_text(text: str) -> List[tuple]:
         "ghp_", "github_pat_", "sk_", "sk-",
     )
     for line in text.splitlines():
-        if not any(m in line for m in _STR_MARKERS):
+        low = line.lower()
+        labelled = any(h.lower() in low for h in _LABELED_HINTS)
+        if not labelled and not any(m.lower() in low for m in _STR_MARKERS):
             continue
         for key, pid, ctx in detect_keys_in_line(line):
             _register_hit(found, seen, key, pid, ctx or line[:400])

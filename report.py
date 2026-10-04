@@ -64,6 +64,7 @@ def working_rows(records) -> List[Dict[str, Any]]:
                 "key": getattr(r, "key", ""),
                 "provider": getattr(r, "provider", ""),
                 "model": model,
+                "tier": t.get("tier") or ("free" if str(model).endswith(":free") or str(model) == "openrouter/free" else "unknown"),
                 "latency_ms": _latency(t),
                 "account": "" if remaining is None else f"{float(remaining):.2f}",
                 "reply": _clean(t.get("reply") or t.get("error") or "", 300),
@@ -93,7 +94,7 @@ def format_working_txt(records, source_dir: str = "") -> Tuple[str, int]:
         "# MACHINE-READABLE SECTION",
         "# one record per line, fields separated by ' | ' (space pipe space).",
         "# lines beginning with '#' are comments and should be skipped.",
-        "# fields: key | provider | provider_name | model | latency_ms | account | reply",
+        "# fields: key | provider | provider_name | model | tier | latency_ms | account | reply",
         "#   account = remaining balance on the account ('' when the provider",
         "#             exposes no balance API); reply = the model's answer to 'hi'",
         "#             ('' when the model ran but returned no visible text).",
@@ -102,7 +103,7 @@ def format_working_txt(records, source_dir: str = "") -> Tuple[str, int]:
     for row in rows:
         lines.append(SEP.join([
             row["key"], row["provider"], _clean(provider_label(row["provider"])),
-            row["model"], row["latency_ms"], row["account"], row["reply"] or "",
+            row["model"], row["tier"], row["latency_ms"], row["account"], row["reply"] or "",
         ]))
     lines += [
         "#" + "-" * 74,
@@ -133,9 +134,10 @@ def format_working_txt(records, source_dir: str = "") -> Tuple[str, int]:
                 continue
             if t.get("ok"):
                 mark = "ok" if t.get("text", True) else "ok*"
+                tier = t.get("tier") or ("free" if str(t.get("model") or "").endswith(":free") or str(t.get("model") or "") == "openrouter/free" else "unknown")
                 body = f'reply="{_clean(t.get("reply") or "", 200)}"' if t.get("text", True) \
                     else "ran but returned no visible text"
-                lines.append(f"#   [{mark}] {t.get('model')} ({t.get('latency_ms', '?')}ms) {body}")
+                lines.append(f"#   [{mark}] {t.get('model')} [{tier}] ({t.get('latency_ms', '?')}ms) {body}")
             else:
                 lines.append(f"#   [--] {t.get('model')} ({_clean(t.get('error') or t.get('status'), 160)})")
         if rec is not None:
