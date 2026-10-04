@@ -156,8 +156,8 @@ def model_tier(model: str, provider: str = "") -> str:
     authoritative. Unknown is never silently treated as free.
     """
     m = str(model or "").lower()
-    if provider == "openrouter" and (m.endswith(":free") or m == "openrouter/free"):
-        return "free"
+    if provider == "openrouter":
+        return "free" if (m.endswith(":free") or m == "openrouter/free") else "paid"
     return "unknown"
 
 
@@ -339,9 +339,20 @@ async def _test(session, key, provider, catalog, limit, timeout, proxy,
     # Carry provider id into chat_once without changing the public registry schema.
     cfg = dict(cfg)
     cfg["chat"] = dict(chat)
-    cfg["chat"]["_provider_id"] = provider
+    cfg["_provider_id"] = provider
 
     stages = _stage_candidates(cfg, catalog, limit)
+    if test_paid:
+        # Explicitly add one paid candidate after the normal/cheap stage. For
+        # OpenRouter, pricing is encoded in the :free suffix; future providers can
+        # supply richer catalog metadata without changing this interface.
+        all_candidates = []
+        for group in stages:
+            all_candidates.extend(group)
+        all_candidates.extend(filter_catalog(catalog))
+        paid = [m for m in all_candidates if model_tier(m, provider) == "paid"]
+        if paid:
+            stages.append([paid[0]])
     if not stages:
         return {"tested": [], "working": [], "note": "no testable models known for this provider"}
 
