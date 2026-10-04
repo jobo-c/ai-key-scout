@@ -52,7 +52,7 @@ Write-Host "[+] Upgrading pip/setuptools/wheel..."
 & $PythonExe -m pip install --upgrade pip setuptools wheel
 
 Write-Host "[+] Installing runtime dependencies..."
-& $PythonExe -m pip install PyQt6 requests PyYAML
+& $PythonExe -m pip install PyQt6 requests PyYAML aiohttp
 
 Write-Host "[+] Checking Python compilation..."
 & $PythonExe -m compileall -q .
