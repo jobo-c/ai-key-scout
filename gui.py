@@ -710,8 +710,10 @@ class MainWindow(QMainWindow):
             records = [r for r in records if r.status == "valid"]
             empty_msg = "No valid keys to recheck."
         else:
-            # all: prefer unchecked first, but include everything in scope
-            empty_msg = "No keys to check.\nPaste keys (or scan a folder), then click Check keys."
+            # all: skip credentials that already have a definitive validation result.
+            # Invalids have an explicit Recheck invalids action; valid keys stay cached.
+            records = [r for r in records if r.status in ("pending", "", "error", "rate_limited", "unknown")]
+            empty_msg = "No unchecked keys. Previously validated credentials were skipped."
 
         items = [(r.key, r.provider) for r in records]
         if not items:
