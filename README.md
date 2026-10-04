@@ -1,6 +1,6 @@
 # AI Key Scout
 
-AI Key Scout is a local-first tool for discovering, validating, testing, ranking, and exporting AI-provider API credentials from files and project directories.
+AI Key Scout v5 is a fast, local-first AI provider capability benchmark for authorized credential auditing. It discovers provider credentials, verifies authentication, tests usable models, ranks results, and builds one portable export folder for Hermes and OpenCode.
 
 > **Authorization and safety:** Only scan and validate credentials you own or are explicitly authorized to audit. API validation can contact provider services and model tests can consume quota. Paid-model testing is opt-in.
 
@@ -49,7 +49,7 @@ The GUI can export the best verified credentials as:
 
 - **Hermes**: `config.yaml` plus a protected `.env`
 - **OpenCode**: `opencode.json` plus a protected `.env`
-- **Both**: a directory containing both configurations
+- **Both**: one directory containing `config.yaml`, `opencode.json`, and one shared protected `.env`
 
 Secrets are referenced through environment variables rather than embedded directly into generated configuration files.
 
@@ -84,6 +84,23 @@ python main.py
 - Review the selected export before using it with Hermes or OpenCode.
 - Network validation should only be performed against accounts and systems you are authorized to test.
 
+## Fast path
+
+The scanner favors cheap provider-specific validation before deeper model work. Model catalogs are queried only when the provider exposes a useful catalog endpoint, model tests are concurrent, and paid inference remains opt-in. Keep `models_per_key` small for fast runs and increase it only when you need broader capability coverage.
+
+### Export layout
+
+A combined export is intentionally flat:
+
+```text
+ai-key-scout-export/
+├── config.yaml
+├── opencode.json
+└── .env
+```
+
+The same `.env` is shared by Hermes and OpenCode, while both configuration files reference environment variables. The `schemas/` directory contains machine-readable JSON Schemas for provider definitions, scan results, queries, and the combined export.
+
 ## Development
 
 Useful areas of the codebase:
@@ -96,6 +113,7 @@ Useful areas of the codebase:
 - `gui.py` — graphical workflow
 - `export_config.py` — Hermes/OpenCode export
 - `workers.py` — background model-testing workers
+- `schemas/` — JSON Schemas for providers, queries, results, and exports
 
 Before opening a pull request, test the scanner and model verification against safe test credentials or mocked provider responses. Never add real credentials to fixtures.
 
