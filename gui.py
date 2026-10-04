@@ -1277,4 +1277,12 @@ class MainWindow(QMainWindow):
         r = self.store.get(self._selected_key)
         if not r:
             return
-        QApplication.clipboard().setText(
+        summary = (
+            f"Provider: {getattr(r, 'provider', '')}\n"
+            f"Status: {getattr(r, 'status', '')}\n"
+            f"Model: {self._best_model_for_record(r)}\n"
+            f"Key: {r.mask(6) if hasattr(r, 'mask') else 'masked'}\n"
+            f"Fingerprint: {getattr(r, 'fingerprint', '')}"
+        )
+        QApplication.clipboard().setText(summary)
+        self._set_status("Summary copied")
