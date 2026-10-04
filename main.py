@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AI Key Scout v4 entry point."""
+"""AI Key Scout v5 entry point."""
 
 from __future__ import annotations
 
@@ -65,11 +65,11 @@ def main() -> int:
 
     try:
         from PyQt6.QtWidgets import QApplication
-        from app.gui import MainWindow
-        from app.providers import PROVIDERS
-        from app import __version__
+        from gui import MainWindow
+        from providers import PROVIDERS
+        import __init__ as package_info
 
-        log.info("version=%s  providers=%d", __version__, len(PROVIDERS))
+        log.info("version=%s  providers=%d", package_info.__version__, len(PROVIDERS))
         app = QApplication(sys.argv)
         app.setApplicationName("AI Key Scout")
         win = MainWindow()

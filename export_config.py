@@ -11,7 +11,7 @@ import os
 import re
 from typing import Any, Dict, Iterable, List, Tuple
 
-from .providers import PROVIDERS
+from providers import PROVIDERS
 
 # Built-in environment names used by Hermes and/or OpenCode providers.
 ENV_NAMES = {

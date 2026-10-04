@@ -10,11 +10,11 @@ from typing import Dict, List, Set
 import aiohttp
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from .details import AdaptiveThrottle, check_provider
-from .modeltest import summarise, test_models_concurrent
-from .providers import alternative_candidates, detect_keys_in_line
-from .ranking import score_record
-from .models_store import KeyRecord
+from details import AdaptiveThrottle, check_provider
+from modeltest import summarise, test_models_concurrent
+from providers import alternative_candidates, detect_keys_in_line
+from ranking import score_record
+from models_store import KeyRecord
 
 log = logging.getLogger("workers")
 

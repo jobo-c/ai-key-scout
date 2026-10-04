@@ -1,0 +1,22 @@
+name: v5-ci
+
+on:
+  push:
+    branches: [main, "v5-*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  compile-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependency
+        run: python -m pip install --upgrade pip pytest
+      - name: Compile
+        run: python -m compileall -q .
+      - name: Run security tests
+        run: python -m pytest

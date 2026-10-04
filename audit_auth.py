@@ -17,8 +17,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.details import check_provider  # noqa: E402
-from app.providers import PROVIDERS, SCAN_ORDER  # noqa: E402
+from details import check_provider  # noqa: E402
+from providers import PROVIDERS, SCAN_ORDER  # noqa: E402
 
 BOGUS = "totally-invalid-key-1234567890abcdef"
 

@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import aiohttp
 
-from .providers import PROVIDERS
+from providers import PROVIDERS
 
 # Models whose names give away that they cannot answer a chat message.
 _NON_CHAT_NOISE = (
