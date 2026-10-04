@@ -65,6 +65,34 @@ Example workflow:
 
 Do not commit generated `.env` files or credential/result artifacts.
 
+## Installation
+
+The repository intentionally does **not** require a `requirements.txt`. The platform installers install the runtime dependencies directly and can create an isolated Python virtual environment.
+
+### Linux / Ubuntu
+
+From the repository directory:
+
+```bash
+chmod +x install_linux.sh
+./install_linux.sh
+```
+
+The installer checks Python/Git, installs CMake and build tools when needed, asks whether to create `.venv`, installs `PyQt6`, `requests`, and `PyYAML`, then runs a compilation check.
+
+### Windows PowerShell
+
+From the repository directory:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\\install_windows.ps1
+```
+
+The Windows installer offers `.venv` and can install CMake through `winget` when CMake is missing.
+
+For the normal isolated setup, answer **Y** to the virtual-environment prompt.
+
 ## Running
 
 The repository is a lightweight Python application. Use a virtual environment and install the project's dependencies before running the application.
