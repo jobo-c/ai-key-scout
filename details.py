@@ -113,12 +113,14 @@ STATE_INVALID = "invalid"
 
 
 _MODEL_ERR_RE = re.compile(
-    r"model\b[^.\n]{0,80}?"
+    r"model\b[^.
+]{0,80}?"
     r"(not found|does not exist|not exist|unknown|unsupported|invalid|end of life|"
     r"end-of-life|deprecated|no longer|retired|decommission|gone)"
     r"|"
     r"(not found|does not exist|unsupported|unknown|deprecated|retired|end of life)"
-    r"[^.\n]{0,40}?\bmodel\b",
+    r"[^.
+]{0,40}?\bmodel\b",
     re.IGNORECASE,
 )
 
@@ -676,7 +678,12 @@ async def check_provider(
     result["state"] = STATE_VALID
     result.setdefault("error", "")
     result.setdefault("details", {})
-    result["details"]["has_balance"] = bool(cfg.get("has_balance"))\n    result["details"]["http_status"] = status\n    result["details"]["latency_ms"] = latency_ms\n    result["details"]["rate_limit"] = _response_rate_metadata(validate_headers)\n    result["details"]["provider_kind"] = cfg.get("provider_kind", "llm")\n    result["details"]["capabilities"] = list(cfg.get("capabilities") or [])
+    result["details"]["has_balance"] = bool(cfg.get("has_balance"))
+    result["details"]["http_status"] = status
+    result["details"]["latency_ms"] = latency_ms
+    result["details"]["rate_limit"] = _response_rate_metadata(validate_headers)
+    result["details"]["provider_kind"] = cfg.get("provider_kind", "llm")
+    result["details"]["capabilities"] = list(cfg.get("capabilities") or [])
     if auth_note:
         result["details"]["auth_note"] = auth_note
         result["info"] = (result.get("info") + " | " if result.get("info") else "") + auth_note
