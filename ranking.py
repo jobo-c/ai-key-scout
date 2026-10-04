@@ -5,9 +5,9 @@ from __future__ import annotations
 import time
 from typing import List, Optional
 
-from .models_store import KeyRecord
-from .providers import provider_name
-from .security import fingerprint, mask_secret
+from models_store import KeyRecord
+from providers import provider_name
+from security import fingerprint, mask_secret
 
 
 def score_record(rec: KeyRecord) -> float:
