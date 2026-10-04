@@ -9,7 +9,9 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
+
+from .providers import PROVIDERS
 
 # Built-in environment names used by Hermes and/or OpenCode providers.
 ENV_NAMES = {
@@ -138,7 +140,7 @@ def write_hermes(records: Iterable[Any], directory: str, limit: int = 1) -> Tupl
     blocks.append(f"  provider: {_yaml_quote(hermes_pid)}")
     blocks.append(f"  default: {_yaml_quote(model)}")
     if hermes_pid == "custom":
-        base = _base_url(__import__("ai_key_scout_export.providers", fromlist=["PROVIDERS"]).PROVIDERS.get(pid, {}))
+        base = _base_url(PROVIDERS.get(pid, {}))
         if base:
             blocks.append(f"  base_url: {_yaml_quote(base)}")
             blocks.append(f"  api_key: {_yaml_quote(' + _env_name(pid) + ')}")
